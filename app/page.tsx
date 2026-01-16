@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { supabase } from './lib/supabase';
 import { 
   Search, Send, Play, 
-  ChevronDown, Plus, X, Upload, Trash2, AlignLeft, MousePointer2, PlusCircle, FileText
+  ChevronDown, Plus, X, Upload, Trash2, AlignLeft, MousePointer2, PlusCircle, FileText, Tag, Copy, Check
 } from 'lucide-react';
 
 export default function Home() {
@@ -14,21 +14,21 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Всі');
   const [ads, setAds] = useState([]);
+  const [copied, setCopied] = useState(false); // Для анімації копіювання
   
-  const categories = ["Гемблінг", "Нутра", "Крипта", "Товарка", "Інфоциганство", "Інше"];
+  const categoriesList = ["Гемблінг", "Нутра", "Крипта", "Товарка", "Інфоциганство", "Інше"];
 
   const [newAd, setNewAd] = useState({
     title: '',           
     mainText: '',        
     format: 'Публікація', 
-    category: 'Інше',
+    categories: ['Інше'],
     buttons: ['Дізнатися більше'],
     image: null,
     file: null,
     type: 'text' 
   });
 
-  // --- 1. ЗАГРУЗКА ИЗ НОВОЙ ТАБЛИЦЫ 'posts' ---
   const fetchAds = async () => {
     setIsLoading(true);
     try {
@@ -49,6 +49,25 @@ export default function Home() {
   useEffect(() => {
     fetchAds();
   }, []);
+
+  const addCategoryField = () => {
+    if (newAd.categories.length < 3) {
+      setNewAd({ ...newAd, categories: [...newAd.categories, 'Інше'] });
+    }
+  };
+
+  const updateCategoryField = (index, value) => {
+    const updated = [...newAd.categories];
+    updated[index] = value;
+    setNewAd({ ...newAd, categories: updated });
+  };
+
+  const removeCategoryField = (index) => {
+    if (newAd.categories.length > 1) {
+      const updated = newAd.categories.filter((_, i) => i !== index);
+      setNewAd({ ...newAd, categories: updated });
+    }
+  };
 
   const addButton = () => {
     if (newAd.buttons.length < 20) {
@@ -80,7 +99,12 @@ export default function Home() {
     }
   };
 
-  // --- 2. СОХРАНЕНИЕ В ТАБЛИЦУ 'posts' ---
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const saveNewAd = async () => {
     if (!newAd.title) {
       return alert("Заповніть хоча б заголовок!");
@@ -110,13 +134,15 @@ export default function Home() {
         finalType = newAd.type; 
       }
 
+      const uniqueCategories = Array.from(new Set(newAd.categories));
+
       const { data: insertedData, error: dbError } = await supabase
         .from('posts')
         .insert([{
           title: newAd.title,
           mainText: newAd.mainText,
           format: newAd.format,
-          category: newAd.category,
+          category: uniqueCategories,
           buttons: newAd.buttons.filter(b => b.trim() !== ''),
           geo: "🇺🇦 UA",
           platform: "Telegram",
@@ -130,7 +156,7 @@ export default function Home() {
       if (insertedData) setAds([insertedData[0], ...ads]);
 
       setIsModalOpen(false);
-      setNewAd({ title: '', mainText: '', format: 'Публікація', category: 'Інше', buttons: ['Дізнатися більше'], image: null, file: null, type: 'text' });
+      setNewAd({ title: '', mainText: '', format: 'Публікація', categories: ['Інше'], buttons: ['Дізнатися більше'], image: null, file: null, type: 'text' });
       
     } catch (error: any) {
       alert('Помилка: ' + error.message);
@@ -155,7 +181,10 @@ export default function Home() {
   const filteredAds = ads.filter((ad) => {
     const searchLow = searchTerm.toLowerCase();
     const matchesSearch = ad.title?.toLowerCase().includes(searchLow);
-    const matchesCategory = categoryFilter === 'Всі' || ad.category === categoryFilter;
+    const matchesCategory = categoryFilter === 'Всі' || 
+                            (Array.isArray(ad.category) && ad.category.includes(categoryFilter)) ||
+                            (ad.category === categoryFilter);
+
     return matchesSearch && matchesCategory;
   });
 
@@ -182,11 +211,11 @@ export default function Home() {
           </button>
 
           <div className="space-y-3">
-            <p className="text-[10px] font-black uppercase text-gray-400 px-1 tracking-widest">Категорії</p>
+            <p className="text-[10px] font-black uppercase text-gray-400 px-1 tracking-widest">Фільтр категорій</p>
             <div className="relative">
               <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="w-full appearance-none bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold outline-none cursor-pointer">
                 <option value="Всі">Всі категорії</option>
-                {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                {categoriesList.map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
               <ChevronDown className="absolute right-4 top-4 text-gray-400" size={16} />
             </div>
@@ -228,9 +257,19 @@ export default function Home() {
                         <img src={ad.image} className="w-full h-full object-cover" alt="" />
                       )
                     ) : <FileText className="text-purple-600/20" size={40} />}
-                    <div className="absolute top-4 left-4 z-10 bg-purple-600/90 backdrop-blur-md px-3 py-1 rounded-full flex items-center gap-2 shadow-sm">
-                      <Send size={10} className="text-white" />
-                      <span className="text-[10px] font-black text-white uppercase tracking-tighter">{ad.category}</span>
+                    
+                    <div className="absolute top-4 left-4 z-10 flex flex-wrap gap-1 max-w-[80%]">
+                      {Array.isArray(ad.category) ? ad.category.map((cat, i) => (
+                        <div key={i} className="bg-purple-600/90 backdrop-blur-md px-2 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                          <Tag size={8} className="text-white" />
+                          <span className="text-[8px] font-black text-white uppercase tracking-tighter">{cat}</span>
+                        </div>
+                      )) : (
+                        <div className="bg-purple-600/90 backdrop-blur-md px-2 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                          <Tag size={8} className="text-white" />
+                          <span className="text-[8px] font-black text-white uppercase tracking-tighter">{ad.category}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -248,7 +287,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* MODAL DETAILS */}
+      {/* --- МОДАЛЬНЕ ВІКНО: ДЕТАЛІ (ОНОВЛЕНО) --- */}
       {selectedAd && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/70 backdrop-blur-md overflow-y-auto">
           <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row relative animate-in zoom-in duration-300 max-h-[90vh]">
@@ -263,14 +302,40 @@ export default function Home() {
                 <div className="p-4 rounded-2xl bg-purple-600/5 text-purple-600"><Send /></div>
                 <div className="flex-1">
                   <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-tight">{selectedAd.title}</h2>
-                  <p className="text-[10px] font-bold text-gray-400 mt-2 uppercase tracking-widest">Telegram • {selectedAd.format} • {selectedAd.category}</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Telegram • {selectedAd.format}</span>
+                    <span className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">•</span>
+                    {Array.isArray(selectedAd.category) ? selectedAd.category.map((c, i) => (
+                      <span key={i} className="text-[10px] font-bold text-purple-600 uppercase tracking-widest bg-purple-50 px-2 py-0.5 rounded-md">{c}</span>
+                    )) : <span className="text-[10px] font-bold text-purple-600 uppercase tracking-widest bg-purple-50 px-2 py-0.5 rounded-md">{selectedAd.category}</span>}
+                  </div>
                 </div>
               </div>
+
               <div className="space-y-8 flex-1">
-                <div>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2"><AlignLeft size={14}/> Текст оголошення</p>
-                  <div className="p-7 bg-gray-50 rounded-[2rem] text-gray-700 leading-relaxed border border-gray-100 text-sm italic">{selectedAd.mainText || "Опис відсутній"}</div>
+                {/* КРАСИВИЙ БЛОК ТЕКСТУ З КОПІЮВАННЯМ */}
+                <div className="relative group">
+                  <div className="flex justify-between items-center mb-3">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                      <AlignLeft size={14}/> Текст оголошення
+                    </p>
+                    
+                    <button 
+                      onClick={() => copyToClipboard(selectedAd.mainText)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 text-purple-600 text-[10px] font-bold transition-all hover:bg-purple-600 hover:text-white group/btn"
+                    >
+                      {copied ? <Check size={12} /> : <Copy size={12} />}
+                      {copied ? 'Скопійовано!' : 'Копіювати текст'}
+                    </button>
+                  </div>
+
+                  <div className="p-7 bg-gray-50/50 rounded-[2rem] border border-gray-100 shadow-inner max-h-[350px] overflow-y-auto no-scrollbar">
+                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words font-medium">
+                      {selectedAd.mainText || "Опис відсутній"}
+                    </p>
+                  </div>
                 </div>
+
                 <div>
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2"><MousePointer2 size={14}/> Активні кнопки</p>
                   <div className="flex flex-wrap gap-2">
@@ -305,7 +370,7 @@ export default function Home() {
 
               <div className="space-y-4">
                 <input type="text" placeholder="Заголовок (Обов'язково)" value={newAd.title} onChange={(e) => setNewAd({...newAd, title: e.target.value})} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 font-bold outline-none focus:bg-white focus:ring-4 focus:ring-purple-600/5 transition-all" />
-                <textarea placeholder="Текст повідомлення" value={newAd.mainText} onChange={(e) => setNewAd({...newAd, mainText: e.target.value})} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 font-bold outline-none focus:bg-white focus:ring-4 focus:ring-purple-600/5 transition-all h-24 resize-none" />
+                <textarea placeholder="Текст повідомлення (зберігайте абзаци)" value={newAd.mainText} onChange={(e) => setNewAd({...newAd, mainText: e.target.value})} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 font-bold outline-none focus:bg-white focus:ring-4 focus:ring-purple-600/5 transition-all h-32 resize-none" />
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -315,11 +380,34 @@ export default function Home() {
                         <option value="Сторіз">Сторіз</option>
                      </select>
                   </div>
+                  
                   <div className="space-y-2">
-                     <p className="text-[9px] font-black uppercase text-gray-400 px-1">Категорія</p>
-                     <select value={newAd.category} onChange={(e) => setNewAd({...newAd, category: e.target.value})} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 font-bold outline-none cursor-pointer">
-                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                     </select>
+                    <div className="flex items-center justify-between px-1">
+                       <p className="text-[9px] font-black uppercase text-gray-400">Категорії ({newAd.categories.length}/3)</p>
+                       {newAd.categories.length < 3 && (
+                         <button onClick={addCategoryField} className="text-purple-600 hover:text-purple-700 transition-colors">
+                            <PlusCircle size={14} />
+                         </button>
+                       )}
+                    </div>
+                    <div className="space-y-2">
+                      {newAd.categories.map((cat, idx) => (
+                        <div key={idx} className="flex gap-2">
+                          <select 
+                            value={cat} 
+                            onChange={(e) => updateCategoryField(idx, e.target.value)} 
+                            className="flex-1 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                          >
+                            {categoriesList.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          {newAd.categories.length > 1 && (
+                            <button onClick={() => removeCategoryField(idx)} className="text-gray-300 hover:text-red-500">
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
