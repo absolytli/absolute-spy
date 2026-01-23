@@ -77,21 +77,6 @@ export default function Home() {
 
   useEffect(() => { fetchAds(); }, []);
 
-  const downloadMedia = async (url, fileName) => {
-    try {
-      const response = await fetch(url);
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = fileName || 'spy-creative';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(blobUrl);
-    } catch (error) { alert('Помилка завантаження'); }
-  };
-
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -149,7 +134,7 @@ export default function Home() {
 
   const deleteAd = async (id, e) => {
     e.stopPropagation();
-    if (confirm("Видалити цей креатив?")) {
+    if (confirm("Видалити?")) {
       const { error } = await supabase.from('posts').delete().eq('id', id);
       if (!error) setAds(ads.filter(ad => ad.id !== id));
     }
@@ -158,19 +143,15 @@ export default function Home() {
   const filteredAds = ads.filter((ad) => {
     const searchLow = searchTerm.toLowerCase();
     const matchesSearch = ad.title?.toLowerCase().includes(searchLow) || ad.mainText?.toLowerCase().includes(searchLow);
-    
     const matchesCategory = filters.category === 'Всі' || 
                             (Array.isArray(ad.category) && ad.category.includes(filters.category)) ||
                             (ad.category === filters.category);
-
     const matchesFormat = filters.format === 'Всі' || ad.format === filters.format;
     const matchesLanguage = filters.language === 'Всі' || ad.language === filters.language;
     const matchesGeo = filters.geo === 'Всі' || ad.geo === filters.geo;
-
     const hasEmojiInText = ad.mainText && emojiRegex.test(ad.mainText);
     const matchesEmoji = !filters.hasEmoji || ad.has_emoji === true || hasEmojiInText;
     const matchesButtons = !filters.hasButtons || ad.has_buttons === true;
-
     return matchesSearch && matchesCategory && matchesFormat && matchesLanguage && matchesGeo && matchesEmoji && matchesButtons;
   });
 
@@ -193,7 +174,6 @@ export default function Home() {
 
           <div className="space-y-5">
             <h3 className="text-[10px] font-black uppercase text-gray-400 px-1 tracking-widest">Фільтрація бази</h3>
-            
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <p className="text-[9px] font-bold text-gray-400 px-1 uppercase">🔹 Ніша (Vertical)</p>
@@ -202,7 +182,6 @@ export default function Home() {
                   {categoriesList.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
-
               <div className="space-y-1.5">
                 <p className="text-[9px] font-bold text-gray-400 px-1 uppercase">🔹 Формат креативу</p>
                 <select value={filters.format} onChange={(e) => setFilters({...filters, format: e.target.value})} className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold outline-none cursor-pointer">
@@ -210,7 +189,6 @@ export default function Home() {
                   {formatsList.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
                 </select>
               </div>
-
               <div className="space-y-1.5">
                 <p className="text-[9px] font-bold text-gray-400 px-1 uppercase">🔹 Географія</p>
                 <select value={filters.geo} onChange={(e) => setFilters({...filters, geo: e.target.value})} className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold outline-none cursor-pointer">
@@ -247,13 +225,12 @@ export default function Home() {
           <div className="max-w-5xl mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-10">
               {filteredAds.map((ad) => (
-                <div key={ad.id} onClick={() => setSelectedAd(ad)} className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative flex flex-col">
+                <div key={ad.id} onClick={() => setSelectedAd(ad)} className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative flex flex-col h-auto">
                   <button onClick={(e) => {e.stopPropagation(); deleteAd(ad.id, e);}} className="absolute top-3 right-3 z-20 p-1.5 bg-white/80 backdrop-blur rounded-full text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
                     <Trash2 size={14} />
                   </button>
 
-                  {/* --- МЕДІА БЛОК: Максимальний розмір, без обрізання (object-contain) --- */}
-                  <div className="bg-gray-50 relative flex items-center justify-center min-h-[250px]">
+                  <div className="bg-gray-50 relative flex items-center justify-center">
                     {ad.image ? (
                       ad.type === 'video' ? (
                         <video src={ad.image} className="w-full h-auto max-h-[500px] object-contain" muted />
@@ -264,7 +241,6 @@ export default function Home() {
                       <div className="h-48 flex items-center justify-center w-full"><FileText className="text-purple-100" size={40} /></div>
                     )}
                     
-                    {/* КАТЕГОРІЇ */}
                     <div className="absolute top-3 left-3 flex flex-wrap gap-1 max-w-[80%] z-10">
                       {Array.isArray(ad.category) ? ad.category.map((cat, i) => (
                           <div key={i} className="bg-purple-600/90 backdrop-blur-md px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
@@ -280,7 +256,6 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* --- ТЕКСТОВИЙ БЛОК: Компактний, без зайвого відступу --- */}
                   <div className="p-3 flex flex-col gap-2 bg-white relative z-10">
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-1.5 text-[9px] font-black text-purple-600 uppercase">
@@ -291,15 +266,10 @@ export default function Home() {
                         <Globe size={8} /> {ad.geo}
                       </div>
                     </div>
-
-                    {/* ЗАГОЛОВОК: Тільки заголовок, компактно */}
-                    <h3 className="font-bold text-gray-800 text-sm line-clamp-2 leading-tight">
-                      {ad.title}
-                    </h3>
-                    
+                    <h3 className="font-bold text-gray-800 text-sm line-clamp-2 leading-tight">{ad.title}</h3>
                      <div className="flex gap-1.5 items-center text-[10px]">
-                       {(ad.has_emoji || (ad.mainText && emojiRegex.test(ad.mainText))) && <span title="Містить емодзі">😃</span>}
-                       {ad.has_buttons && <span title="Має кнопки">🖱️</span>}
+                       {(ad.has_emoji || (ad.mainText && emojiRegex.test(ad.mainText))) && <span>😃</span>}
+                       {ad.has_buttons && <span>🖱️</span>}
                     </div>
                   </div>
                 </div>
@@ -332,12 +302,10 @@ export default function Home() {
                   </select>
                 </div>
               </div>
-
               <div className="space-y-4">
                 <input type="text" placeholder="Заголовок креативу" value={newAd.title} onChange={(e) => setNewAd({...newAd, title: e.target.value})} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 font-bold outline-none focus:bg-white focus:ring-4 focus:ring-purple-600/5 transition-all" />
                 <textarea placeholder="Рекламний текст" value={newAd.mainText} onChange={(e) => setNewAd({...newAd, mainText: e.target.value})} className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-6 py-4 font-bold outline-none focus:bg-white h-32 resize-none transition-all" />
               </div>
-
               <div className="relative h-32 bg-purple-50 rounded-3xl border-2 border-dashed border-purple-200 flex flex-col items-center justify-center overflow-hidden hover:border-purple-400 transition-colors group cursor-pointer">
                 {newAd.image ? (
                   newAd.type === 'video' ? <video src={newAd.image} className="w-full h-full object-cover" muted /> : <img src={newAd.image} className="w-full h-full object-cover" alt="" />
@@ -349,7 +317,6 @@ export default function Home() {
                   if(f) setNewAd({...newAd, file: f, image: URL.createObjectURL(f), type: f.type.includes('video') ? 'video' : 'image'})
                 }} className="absolute inset-0 opacity-0 cursor-pointer" />
               </div>
-
               <div className="space-y-2">
                 <div className="flex justify-between items-center px-1">
                   <p className="text-[10px] font-black uppercase text-gray-400">Ніші (Max 3)</p>
