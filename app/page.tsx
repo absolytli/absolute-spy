@@ -299,6 +299,16 @@ export default function Home() {
             <LayoutDashboard size={18} /> Стрічка
           </button>
           
+          {/* --- НОВАЯ КНОПКА ИЗБРАННОГО --- */}
+          <button onClick={() => setActiveTab('favorites')} className={`w-full p-4 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 transition-all ${activeTab === 'favorites' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-400 hover:bg-gray-50'}`}>
+            <Star size={18} /> Обране
+            {favoriteIds.length > 0 && (
+              <span className="ml-auto bg-purple-100 text-purple-600 px-2 py-0.5 rounded-md text-[9px] font-black">
+                {favoriteIds.length}
+              </span>
+            )}
+          </button>
+
           <button onClick={() => setActiveTab('profile')} className={`w-full p-4 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 transition-all ${activeTab === 'profile' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-400 hover:bg-gray-50'}`}>
             <User size={18} /> Мій кабінет
           </button>
@@ -395,6 +405,52 @@ export default function Home() {
               </div>
             </div>
           </>
+          /* --- ЭКРАН ИЗБРАННОГО --- */
+        ) : activeTab === 'favorites' ? (
+          <div className="flex-1 overflow-y-auto p-8 bg-[#f8f9fc] no-scrollbar animate-in fade-in duration-300">
+            <header className="mb-8 max-w-5xl mx-auto flex items-center gap-4">
+               <div className="w-12 h-12 bg-yellow-100 text-yellow-500 rounded-2xl flex items-center justify-center shadow-sm">
+                 <Star size={24} fill="currentColor" />
+               </div>
+               <div>
+                 <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase italic">Моя колекція</h1>
+                 <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mt-1">
+                   Збережені креативи: {favoriteIds.length}
+                 </p>
+               </div>
+            </header>
+
+            <div className="max-w-5xl mx-auto">
+              {favoriteIds.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-10">
+                  {ads.filter((ad: any) => favoriteIds.includes(ad.id)).map((ad: any) => {
+                    return (
+                      <AdCard 
+                        key={ad.id}
+                        ad={ad}
+                        isLocked={false} 
+                        isFavorite={true}
+                        canPost={canPost}
+                        formatsList={formatsList}
+                        onClick={() => handleAdClick(ad, false, 'favorites')}
+                        onToggleFavorite={(e) => toggleFavorite(ad.id, e)}
+                        onDelete={(e) => deleteAd(ad.id, e)}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 text-center opacity-50">
+                   <Star size={64} className="text-gray-200 mb-4" />
+                   <h3 className="text-xl font-black text-gray-300 uppercase">Тут поки порожньо</h3>
+                   <p className="text-gray-400 text-xs font-bold uppercase mt-2">Додавай креативи зі стрічки, щоб не загубити</p>
+                   <button onClick={() => setActiveTab('feed')} className="mt-6 px-6 py-3 bg-purple-600 text-white rounded-xl font-black uppercase text-xs shadow-lg hover:bg-purple-700 transition-all">
+                     Перейти до стрічки
+                   </button>
+                </div>
+              )}
+            </div>
+          </div>
         ) : activeTab === 'profile' ? (
           <div className="flex-1 overflow-y-auto p-12 bg-[#f8f9fc] no-scrollbar animate-in fade-in duration-500">
             <div className="max-w-4xl mx-auto">
@@ -420,51 +476,7 @@ export default function Home() {
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Тарифний план</p>
                 </div>
               </div>
-
-              {/* --- БЛОК ОБРАНОГО (FAVORITES) --- */}
-              <div className="mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="flex items-center justify-between mb-6 px-1">
-                  <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                    <Star size={14} className="text-yellow-400 fill-yellow-400" /> Моя колекція ({favoriteIds.length})
-                  </h3>
-                  {favoriteIds.length > 0 && (
-                    <p className="text-[9px] font-bold text-gray-300 uppercase italic">Твої збережені ідеї</p>
-                  )}
-                </div>
-                
-                {favoriteIds.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {ads.filter((ad: any) => favoriteIds.includes(ad.id)).map((ad: any) => (
-                      <div key={ad.id} onClick={() => handleAdClick(ad, false, 'favorites')} className="aspect-[3/4] bg-white rounded-[2rem] overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group relative">
-                        <div className="w-full h-full relative">
-                          {ad.type === 'video' ? (
-                            <video src={Array.isArray(ad.image) ? ad.image[0] : ad.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" muted playsInline onMouseOver={(e) => e.currentTarget.play()} onMouseOut={(e) => e.currentTarget.pause()} />
-                          ) : (
-                            <img src={Array.isArray(ad.image) ? ad.image[0] : ad.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="" />
-                          )}
-                        </div>
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                           <p className="text-[8px] font-black text-white uppercase tracking-wider mb-1 line-clamp-1">{ad.title}</p>
-                           <div className="flex items-center gap-1 text-white/80 font-bold text-[7px]">
-                             <Play size={8} fill="currentColor" /> ДЕТАЛЬНІШЕ
-                           </div>
-                        </div>
-                        <button onClick={(e) => { e.stopPropagation(); toggleFavorite(ad.id, e); }} className="absolute top-2 right-2 p-1.5 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-red-500 transition-colors opacity-0 group-hover:opacity-100">
-                          <X size={10} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="p-16 border-2 border-dashed border-gray-100 rounded-[3rem] text-center bg-gray-50/30">
-                    <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                      <Star size={24} className="text-gray-200" />
-                    </div>
-                    <p className="text-[10px] font-bold text-gray-300 uppercase tracking-[0.2em]">Тут поки порожньо</p>
-                  </div>
-                )}
-              </div>
-
+              
               {/* --- ЛІЧИЛЬНИК ЛІМІТІВ --- */}
               <div className="bg-white p-10 rounded-[3rem] shadow-sm border border-gray-100 mb-8 relative overflow-hidden group">
                 {userProfile?.subscription_tier === 'pro' && (
@@ -694,7 +706,7 @@ export default function Home() {
                  }
                  return null;
               })()}
-              
+
 {/* --- ФІКС КАТЕГОРІЙ (String -> Array) --- */}
               {(() => {
                  let data = selectedAd.category || selectedAd.categories;
