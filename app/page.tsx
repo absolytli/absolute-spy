@@ -1,5 +1,5 @@
 'use client';
-import AdCard from './components/AdCard';
+import AdCard from './components/AdCard.tsx';
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { supabase } from './lib/supabase';
@@ -322,7 +322,7 @@ export default function Home() {
               <div className="space-y-4">
                 <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">Фільтрація</h3>
                 <div className="space-y-1.5">
-                  <p className="text-[9px] font-bold text-gray-400 px-1 uppercase">🔹 Ніша</p>
+                <p className="text-[9px] font-bold text-gray-400 px-1 uppercase">🔹 Категорії</p>
                   <select value={filters.category} onChange={(e) => setFilters({...filters, category: e.target.value})} className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold outline-none">
                     <option value="Всі">Всі ніші</option>
                     {categoriesList.map(cat => <option key={cat} value={cat}>{cat}</option>)}
@@ -641,36 +641,99 @@ export default function Home() {
                 );
               })()}
             </div>
-
-            <div className="lg:w-1/2 p-12 overflow-y-auto bg-white flex flex-col">
+<div className="lg:w-1/2 p-12 overflow-y-auto bg-white flex flex-col">
               <div className="mb-6 flex justify-between items-center">
                 <div className="flex gap-2">
                   <span className="text-[10px] font-black text-purple-600 uppercase bg-purple-50 px-3 py-1 rounded-full">{selectedAd.format}</span>
                   <span className="text-[10px] font-black text-gray-500 uppercase bg-gray-50 px-3 py-1 rounded-full">{selectedAd.geo}</span>
                 </div>
-                {/* ЛІЧИЛЬНИК (виправлено) */}
+                {/* ЛІЧИЛЬНИК */}
                 <div className="text-[10px] font-bold text-gray-300 uppercase bg-gray-50 px-3 py-1 rounded-full">
                   {currentViewableIndex + 1} / {activeNavigationList.length}
                 </div>
               </div>
 
-               {/* --- КАТЕГОРИИ (ТЕГИ) --- */}
-              {((selectedAd.category && Array.isArray(selectedAd.category)) || (selectedAd.categories && Array.isArray(selectedAd.categories))) && (
-                 <div className="flex flex-wrap gap-2 mb-4">
-                    {(selectedAd.category || selectedAd.categories).map((cat: any, i: number) => (
-                       <span key={i} className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[9px] font-black uppercase tracking-wider">
-                         #{cat}
-                       </span>
-                    ))}
-                 </div>
-              )}
+{/* --- ВСТАВЛЯЕМ СЮДА (НАД ЗАГОЛОВКОМ) --- */}
+              {(() => {
+                 // 1. Ищем данные в category ИЛИ categories
+                 const data = selectedAd.category || selectedAd.categories;
+                 // 2. Делаем массив, чтобы не было ошибок
+                 const safeCategories = Array.isArray(data) ? data : [];
+
+                 if (safeCategories.length > 0) {
+                   return (
+                     <div className="flex flex-wrap gap-2 mb-4">
+                        {safeCategories.map((cat: any, i: number) => (
+                           <span key={i} className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                             #{cat}
+                           </span>
+                        ))}
+                     </div>
+                   );
+                 }
+                 return null;
+              })()}
+
+              {/* --- УНІВЕРСАЛЬНИЙ БЛОК КАТЕГОРІЙ (Виправлений) --- */}
+              {(() => {
+                 // 1. Шукаємо дані в будь-якому з полів (одне число чи множина)
+                 const data = selectedAd.category || selectedAd.categories;
+                 // 2. Робимо з цього масив, щоб не ламалося
+                 const safeCategories = Array.isArray(data) ? data : [];
+
+                 if (safeCategories.length > 0) {
+                   return (
+                     <div className="flex flex-wrap gap-2 mb-4">
+                        {safeCategories.map((cat: any, i: number) => (
+                           <span key={i} className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                             #{cat}
+                           </span>
+                        ))}
+                     </div>
+                   );
+                 }
+                 return null;
+              })()}
+              
+{/* --- ФІКС КАТЕГОРІЙ (String -> Array) --- */}
+              {(() => {
+                 let data = selectedAd.category || selectedAd.categories;
+
+                 // ВАЖЛИВО: Якщо база віддала текст замість масиву — перетворюємо його назад
+                 if (typeof data === 'string') {
+                    try {
+                      // Спробуємо перетворити рядок "['a','b']" у справжній масив
+                      const parsed = JSON.parse(data);
+                      data = parsed;
+                    } catch (e) {
+                      // Якщо це просто одне слово без дужок
+                      data = [data];
+                    }
+                 }
+
+                 // Тепер це точно масив
+                 const safeCategories = Array.isArray(data) ? data : [];
+
+                 if (safeCategories.length > 0) {
+                   return (
+                     <div className="flex flex-wrap gap-2 mb-4">
+                        {safeCategories.map((cat: any, i: number) => (
+                           <span key={i} className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                             #{cat}
+                           </span>
+                        ))}
+                     </div>
+                   );
+                 }
+                 return null;
+              })()}
 
               <h2 className="text-2xl font-black text-gray-900 uppercase italic mb-6 leading-tight">{selectedAd.title}</h2>
               <div className="p-8 bg-gray-50 rounded-[2rem] text-sm whitespace-pre-wrap leading-relaxed flex-1 border border-gray-100">
                 {selectedAd.mainText || "Опис відсутній"}
               </div>
 
-              {/* --- ДОДАНО: КНОПКИ --- */}
+              {/* --- КНОПКИ --- */}
               {selectedAd.buttons && Array.isArray(selectedAd.buttons) && selectedAd.buttons.length > 0 && (
                  <div className="space-y-2 mt-4">
                     {selectedAd.buttons.map((btn: any, idx: number) => (
