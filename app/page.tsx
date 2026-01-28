@@ -1,10 +1,11 @@
 'use client';
+import AdCard from './components/AdCard';
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { supabase } from './lib/supabase';
 import Auth from './components/Auth'; 
 import { 
-Search, Send, Play, Star, Download, ChevronDown, ChevronLeft, ChevronRight, Plus, X, Upload, Trash2,
+  Search, Send, Play, Star, Download, ChevronLeft, ChevronRight, Plus, X, Upload, Trash2,
   AlignLeft, MousePointer2, PlusCircle, FileText, Tag, Copy, Check, 
   Smartphone, MessageCircle, Mic, Share2, Globe, Camera, Smile, Layers, LogOut,
   User, LayoutDashboard, Settings, Database, ShieldCheck
@@ -16,13 +17,13 @@ export default function Home() {
   const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('feed'); // 'feed' або 'profile'
 
-// --- ОСНОВНІ СТАНИ ---
+  // --- ОСНОВНІ СТАНИ ---
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false); 
   const [selectedAd, setSelectedAd] = useState<any>(null); 
   const [searchTerm, setSearchTerm] = useState('');
   const [ads, setAds] = useState<any[]>([]);
-const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [profiles, setProfiles] = useState<any[]>([]); 
   const [userProfile, setUserProfile] = useState<any>(null); 
@@ -33,16 +34,9 @@ const [copied, setCopied] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const workSpheresList = [
-    "Affiliate-маркетинг (Telegram)",
-    "Арбітраж трафіку (Telegram)",
-    "Гемблінг / Беттінг (Telegram)",
-    "Крипто / Інвестиції (Telegram)",
-    "E-commerce / Товари (Telegram)",
-    "Новинні канали",
-    "SMM / Адміністрування каналів",
-    "Продюсування Telegram-каналів",
-    "Креативи / Дизайн / Відео",
-    "Інше"
+    "Affiliate-маркетинг (Telegram)", "Арбітраж трафіку (Telegram)", "Гемблінг / Беттінг (Telegram)",
+    "Крипто / Інвестиції (Telegram)", "E-commerce / Товари (Telegram)", "Новинні канали",
+    "SMM / Адміністрування каналів", "Продюсування Telegram-каналів", "Креативи / Дизайн / Відео", "Інше"
   ];
   const ADMIN_EMAIL = "oleynik.igor.96@gmail.com"; 
   
@@ -72,12 +66,7 @@ const [copied, setCopied] = useState(false);
   ];
 
   const [filters, setFilters] = useState({
-    category: 'Всі',
-    format: 'Всі',
-    language: 'Всі',
-    geo: 'Всі',
-    hasEmoji: false,
-    hasButtons: false
+    category: 'Всі', format: 'Всі', language: 'Всі', geo: 'Всі', hasEmoji: false, hasButtons: false
   });
 
   const [newAd, setNewAd] = useState<any>({
@@ -85,8 +74,6 @@ const [copied, setCopied] = useState(false);
     language: 'Українська', geo: 'Україна', hasEmoji: false, 
     buttons: ['Дізнатися більше'], image: null, file: null, type: 'text' 
   });
-
-  const emojiRegex = /\p{Extended_Pictographic}/u;
 
   useEffect(() => {
     const checkUser = async () => {
@@ -112,95 +99,47 @@ const [copied, setCopied] = useState(false);
     finally { setIsLoading(false); }
   };
 
-  // --- ВОТ ЭТОЙ ФУНКЦИИ НЕ ХВАТАЛО ---
   const fetchProfiles = async () => {
-    // Якщо пошта не збігається з адмінською — виходимо
     if (user?.email !== ADMIN_EMAIL) return;
-
-    // Стукаємо в таблицю
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    // Якщо все гуд — записуємо в пам'ять
-    if (!error && data) {
-      setProfiles(data);
-    }
+    const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    if (!error && data) setProfiles(data);
   };
-  // --- НОВІ ФУНКЦІЇ (ВСТАВЛЯТИ ПІСЛЯ fetchProfiles) ---
-  // --- ЛОГІКА ОБРАНОГО ---
+
   const fetchFavorites = async () => {
     if (!user) return;
-    const { data, error } = await supabase
-      .from('favorites')
-      .select('post_id')
-      .eq('user_id', user.id);
-    
-    if (!error && data) {
-      setFavoriteIds(data.map((f: any) => f.post_id));
-    }
+    const { data, error } = await supabase.from('favorites').select('post_id').eq('user_id', user.id);
+    if (!error && data) setFavoriteIds(data.map((f: any) => f.post_id));
   };
 
   const toggleFavorite = async (postId: any, e: any) => {
-    e.stopPropagation(); // Щоб не відкривалася модалка при кліку на зірочку
+    e.stopPropagation();
     if (!user) return alert("Будь ласка, авторизуйтесь");
-
     if (favoriteIds.includes(postId)) {
-      const { error } = await supabase
-        .from('favorites')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('post_id', postId);
+      const { error } = await supabase.from('favorites').delete().eq('user_id', user.id).eq('post_id', postId);
       if (!error) setFavoriteIds(prev => prev.filter(id => id !== postId));
     } else {
-      const { error } = await supabase
-        .from('favorites')
-        .insert([{ user_id: user.id, post_id: postId }]);
+      const { error } = await supabase.from('favorites').insert([{ user_id: user.id, post_id: postId }]);
       if (!error) setFavoriteIds(prev => [...prev, postId]);
     }
   };
 
-  // --- ОБНОВЛЕННЫЕ ФУНКЦИИ ---
-  
   const checkUserProfile = async () => {
     if (!user) return;
-    // Теперь запрашиваем ВСЕ данные профиля (*)
     const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    
     if (!error && data) {
-      setUserProfile(data); // Сохраняем профиль в память, чтобы показать в кабинете
-      if (!data.work_sphere) setShowOnboarding(true); // Если сферы нет — показываем окно
+      setUserProfile(data);
+      if (!data.work_sphere) setShowOnboarding(true);
     }
   };
-const saveWorkSphere = async (sphere: any) => {
+
+  const saveWorkSphere = async (sphere: any) => {
     try {
-      console.log("Спроба зберегти сферу:", sphere); // Для перевірки в консолі
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({ work_sphere: sphere })
-        .eq('id', user.id);
-
-      if (error) {
-        console.error("Помилка Supabase:", error);
-        throw error;
-      }
-      
-      console.log("Успішно збережено!");
-
-      // 1. Оновлюємо профіль у пам'яті сайту (щоб з'явилося в кабінеті)
-      if (userProfile) {
-        setUserProfile({ ...userProfile, work_sphere: sphere });
-      } else {
-        // Якщо профіль ще не завантажився, створюємо тимчасовий
-        setUserProfile({ id: user.id, work_sphere: sphere });
-      }
-
-      // 2. Закриваємо вікно
+      const { error } = await supabase.from('profiles').update({ work_sphere: sphere }).eq('id', user.id);
+      if (error) throw error;
+      if (userProfile) setUserProfile({ ...userProfile, work_sphere: sphere });
+      else setUserProfile({ id: user.id, work_sphere: sphere });
       setShowOnboarding(false); 
-
-    } catch (error: any) {
+    } catch (error: any) { 
       console.error("Критична помилка збереження:", error.message);
       alert("Не вдалося зберегти дані. Перевірте консоль (F12).");
     }
@@ -208,44 +147,35 @@ const saveWorkSphere = async (sphere: any) => {
   
   useEffect(() => { 
     if (user) {
-      fetchAds(); // Завантажуємо оголошення для всіх
+      fetchAds();
       fetchFavorites();
       checkUserProfile();
-
-      // А це запускаємо ТІЛЬКИ якщо ти — адмін
-      if (user.email === ADMIN_EMAIL) {
-        fetchProfiles(); 
-      }
+      if (user.email === ADMIN_EMAIL) fetchProfiles();
     }
-  }, [user]); // Сайт "прокинеться" кожного разу, коли змінюється статус юзера
+  }, [user]);
 
-// --- 1. ФІЛЬТРАЦІЯ ---
-const filteredAds = ads.filter((ad: any) => {
-  const searchLow = searchTerm.toLowerCase();
-  const matchesSearch = ad.title?.toLowerCase().includes(searchLow) || ad.mainText?.toLowerCase().includes(searchLow);
-  const matchesCategory = filters.category === 'Всі' || (Array.isArray(ad.category) && ad.category.includes(filters.category)) || (ad.category === filters.category);
-  const matchesFormat = filters.format === 'Всі' || ad.format === filters.format;
-  const matchesGeo = filters.geo === 'Всі' || ad.geo === filters.geo;
+  // --- 1. ФІЛЬТРАЦІЯ ---
+  const filteredAds = ads.filter((ad: any) => {
+    const searchLow = searchTerm.toLowerCase();
+    const matchesSearch = ad.title?.toLowerCase().includes(searchLow) || ad.mainText?.toLowerCase().includes(searchLow);
+    const matchesCategory = filters.category === 'Всі' || (Array.isArray(ad.category) && ad.category.includes(filters.category)) || (ad.category === filters.category);
+    const matchesFormat = filters.format === 'Всі' || ad.format === filters.format;
+    const matchesGeo = filters.geo === 'Всі' || ad.geo === filters.geo;
+    return matchesSearch && matchesCategory && matchesFormat && matchesGeo;
+  });
 
-  return matchesSearch && matchesCategory && matchesFormat && matchesGeo;
-});
+  // --- 2. ЛОГІКА ДОСТУПУ ТА СПИСКІВ ---
+  const isPro = userProfile?.subscription_tier === 'pro';
+  const viewableAds = filteredAds.filter((ad: any, index: number) => isPro || (index % 6 === 0));
 
-// --- 2. ЛОГІКА ДОСТУПУ ТА СПИСКІВ ---
-const isPro = userProfile?.subscription_tier === 'pro';
-const viewableAds = filteredAds.filter((ad: any, index: number) => isPro || (index % 6 === 0));
-
-// --- 2.1 АВТОМАТИЧНЕ ЗАПОВНЕННЯ СПИСКУ НАВІГАЦІЇ ---
-useEffect(() => {
+  useEffect(() => {
     if (viewableAds.length > 0 && activeNavigationList.length === 0) {
       setActiveNavigationList(viewableAds);
     }
-}, [viewableAds]);
+  }, [viewableAds]);
 
-
-  // 3. Розумний індекс: шукаємо пост у ТОМУ списку, який зараз активний 🧭
   const currentViewableIndex = selectedAd ? activeNavigationList.findIndex((a: any) => a.id === selectedAd.id) : -1;
 
-  // 4. Функції гортання тепер працюють з activeNavigationList
   const goToNextAd = useCallback(() => {
     if (currentViewableIndex < activeNavigationList.length - 1) {
       setSelectedAd(activeNavigationList[currentViewableIndex + 1]);
@@ -260,7 +190,6 @@ useEffect(() => {
     }
   }, [currentViewableIndex, activeNavigationList]);
 
-  // 5. Слухач клавіатури
   useEffect(() => {
     const handleKeyDown = (e: any) => {
       if (!selectedAd) return;
@@ -272,14 +201,6 @@ useEffect(() => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedAd, goToNextAd, goToPrevAd]);
 
-  // 6. Додаткові функції
-  const copyToClipboard = (text: any) => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  // --- ВИПРАВЛЕНА ФУНКЦІЯ ЗБЕРЕЖЕННЯ (З GIST ВОНА БУЛА ОБІРВАНА) ---
   const saveNewAd = async () => {
     if (!newAd.title) return alert("Заповніть заголовок!");
     setIsLoading(true);
@@ -313,60 +234,40 @@ useEffect(() => {
     }
   };
 
-  // --- ВИПРАВЛЕНА ФУНКЦІЯ (Вміє працювати з Favorites) ---
   const handleAdClick = async (ad: any, isLocked: any, source = 'feed') => {
     if (isLocked) {
       alert("🔒 Цей креатив доступний тільки в PRO версії!");
       return; 
     }
-
-    // 1. Встановлюємо, що саме ми зараз гортаємо
     if (source === 'favorites') {
       const favoritesList = ads.filter((a: any) => favoriteIds.includes(a.id));
       setActiveNavigationList(favoritesList);
     } else {
       setActiveNavigationList(viewableAds);
     }
-
     setSelectedAd(ad);
 
     if (userProfile?.subscription_tier === 'pro') return;
-
     const today = new Date().toDateString(); 
     let currentCount = userProfile?.daily_views_count || 0;
-    
-    if (userProfile?.last_view_date !== today) {
-      currentCount = 0;
-    }
+    if (userProfile?.last_view_date !== today) currentCount = 0;
 
     if (currentCount >= 30) {
       alert("⚠️ Ви вичерпали ліміт (30 креативів) на сьогодні. Купіть PRO!");
       setSelectedAd(null);
       return;
     }
-
     const newCount = currentCount + 1;
     setUserProfile({ ...userProfile, daily_views_count: newCount, last_view_date: today });
-
-    await supabase.from('profiles').update({ 
-      daily_views_count: newCount,
-      last_view_date: today
-    }).eq('id', user.id);
+    await supabase.from('profiles').update({ daily_views_count: newCount, last_view_date: today }).eq('id', user.id);
   };
 
   const toggleSubscription = async (userId: any, currentTier: any) => {
     const newTier = currentTier === 'pro' ? 'free' : 'pro';
-    console.log(`Попытка изменить статус для ${userId} на ${newTier}...`);
     const { error } = await supabase.from('profiles').update({ subscription_tier: newTier }).eq('id', userId);
-
-    if (error) {
-      alert("Ошибка базы данных: " + error.message);
-    } else {
-      console.log("Статус успешно обновлен в базе!");
+    if (!error) {
       setProfiles(prev => prev.map((p: any) => p.id === userId ? { ...p, subscription_tier: newTier } : p));
-      if (userId === user?.id) {
-        setUserProfile((prev: any) => ({ ...prev, subscription_tier: newTier }));
-      }
+      if (userId === user?.id) setUserProfile((prev: any) => ({ ...prev, subscription_tier: newTier }));
     }
   };
   
@@ -471,76 +372,26 @@ useEffect(() => {
 
             <div className="flex-1 overflow-y-auto p-8 bg-[#f8f9fc] no-scrollbar">
               <div className="max-w-5xl mx-auto">
+                {/* --- ВОТ ТУТ МЫ ЗАМЕНИЛИ СТАРЫЙ КОД НА НОВЫЙ КОМПОНЕНТ --- */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-10">
                   {filteredAds.map((ad: any, index: number) => {
                     const isLocked = !isPro && (index % 6 !== 0);
                     return (
-                      <div key={ad.id} onClick={() => handleAdClick(ad, isLocked, 'feed')} className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative flex flex-col h-auto">
-                        
-                        {canPost && (
-                          <button onClick={(e) => {e.stopPropagation(); deleteAd(ad.id, e);}} className="absolute top-3 right-3 z-30 p-1.5 bg-white/80 backdrop-blur rounded-full text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                        
-                        <button 
-                          onClick={(e) => toggleFavorite(ad.id, e)}
-                          className={`absolute top-3 left-3 z-30 p-2 rounded-full backdrop-blur-md transition-all duration-300 shadow-sm ${
-                            favoriteIds.includes(ad.id) 
-                              ? 'bg-yellow-400 text-white shadow-yellow-200 scale-110' 
-                              : 'bg-white/50 text-gray-400 hover:bg-white hover:text-yellow-400 opacity-0 group-hover:opacity-100'
-                          }`}
-                        >
-                          <Star size={16} fill={favoriteIds.includes(ad.id) ? "currentColor" : "none"} />
-                        </button>
-                        
-                        <div className="bg-gray-50 relative flex items-center justify-center overflow-hidden">
-                          {isLocked && (
-                            <div className="absolute inset-0 z-20 backdrop-blur-md bg-white/40 flex flex-col items-center justify-center text-center p-4">
-                              <div className="w-12 h-12 bg-gray-900 text-white rounded-full flex items-center justify-center mb-2 shadow-lg animate-pulse">
-                                <ShieldCheck size={24} />
-                              </div>
-                              <span className="font-black text-gray-900 text-[10px] uppercase tracking-widest bg-white px-3 py-1 rounded-lg shadow-sm">
-                                Тільки PRO
-                              </span>
-                            </div>
-                          )}
-
-                          {ad.image ? (
-                            ad.type === 'video' ? (
-                              <video src={Array.isArray(ad.image) ? ad.image[0] : ad.image} className={`w-full h-auto max-h-[500px] object-contain transition-all duration-500 ${isLocked ? 'blur-sm scale-110 grayscale-[50%]' : ''}`} muted />
-                            ) : (
-                              <img src={Array.isArray(ad.image) ? ad.image[0] : ad.image} className={`w-full h-auto max-h-[500px] object-contain transition-all duration-500 ${isLocked ? 'blur-sm scale-110 grayscale-[50%]' : ''}`} alt="" />
-                            )
-                          ) : ( <div className="h-48 flex items-center justify-center w-full"><FileText className="text-purple-100" size={40} /></div> )}
-                        </div>
-
-                        <div className="p-4 bg-white relative z-10">
-                          <div className="flex justify-between items-center mb-1">
-                            {/* --- ДОБАВЛЕНО ОТОБРАЖЕНИЕ КАТЕГОРИЙ В КАРТОЧКЕ --- */}
-                            <div className="flex flex-wrap gap-1 items-center">
-                                <div className="text-[9px] font-black text-purple-600 uppercase">
-                                  {formatsList.find(f => f.id === ad.format)?.label || ad.format}
-                                </div>
-                                {ad.category && Array.isArray(ad.category) && ad.category.slice(0, 2).map((cat: any, i: number) => (
-                                   <span key={i} className="text-[8px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded-md uppercase">
-                                     {cat}
-                                   </span>
-                                ))}
-                            </div>
-                            <div className="text-[8px] font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-md">
-                              <Globe size={8} className="inline mr-1"/>{ad.geo}
-                            </div>
-                          </div>
-                          
-                          <h3 className={`font-bold text-gray-800 text-sm line-clamp-2 leading-tight transition-all ${isLocked ? 'blur-[3px] select-none opacity-40' : ''}`}>
-                            {isLocked ? "Цей контент доступний у Premium підписці" : ad.title}
-                          </h3>
-                        </div>
-                      </div>
+                      <AdCard 
+                        key={ad.id}
+                        ad={ad}
+                        isLocked={isLocked}
+                        isFavorite={favoriteIds.includes(ad.id)}
+                        canPost={canPost}
+                        formatsList={formatsList}
+                        onClick={() => handleAdClick(ad, isLocked, 'feed')}
+                        onToggleFavorite={(e) => toggleFavorite(ad.id, e)}
+                        onDelete={(e) => deleteAd(ad.id, e)}
+                      />
                     );
                   })}
                 </div>
+                {/* --- КОНЕЦ СПИСКА --- */}
               </div>
             </div>
           </>
