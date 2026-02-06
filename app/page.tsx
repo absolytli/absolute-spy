@@ -131,16 +131,82 @@ export default function Home() {
     buttons: ['Дізнатися більше'], image: null, file: null, files: [], type: 'text' 
   });
 
+// Функція для автоматичного входу через Telegram
+  const handleTelegramAuth = async (tgUser: any) => {
+    try {
+      // Створюємо унікальний email та пароль на основі Telegram ID
+      const tgEmail = `tg_${tgUser.id}@absolute-spy.internal`;
+      const tgPassword = `tg_pass_${tgUser.id}_secret_key`; 
+
+      // 1. Пробуємо увійти
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: tgEmail,
+        password: tgPassword,
+      });
+
+      // 2. Якщо юзера немає — реєструємо
+      if (signInError) {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: tgEmail,
+          password: tgPassword,
+          options: {
+            data: {
+              full_name: tgUser.first_name + (tgUser.last_name ? ` ${tgUser.last_name}` : ''),
+              username: tgUser.username,
+              avatar_url: tgUser.photo_url,
+            }
+          }
+        });
+        if (signUpError) throw signUpError;
+        setUser(signUpData.user);
+      } else {
+        setUser(signInData.user);
+      }
+
+      // 3. Синхронізуємо з таблицею профілів
+      await supabase.from('profiles').upsert({
+        id: (signInData.user || (await supabase.auth.getUser()).data.user)?.id,
+        email: tgEmail,
+        telegram_id: tgUser.id,
+        full_name: tgUser.first_name,
+        avatar_url: tgUser.photo_url,
+      });
+
+    } catch (err: any) {
+      console.error("ТГ Авторизація не вдалася:", err.message);
+    }
+  };
+
   useEffect(() => {
-    const checkUser = async () => {
+    const initApp = async () => {
+      // --- ПЕРЕВІРКА TELEGRAM WEB APP ---
+      if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
+        const tg = (window as any).Telegram.WebApp;
+        tg.ready();
+        tg.expand(); // Розгортаємо на весь екран
+        
+        // Вібрація при старті (приємна дрібниця)
+        tg.HapticFeedback.impactOccurred('medium');
+
+        const tgData = tg.initDataUnsafe?.user;
+        if (tgData) {
+          // Запускаємо наш безшовний логін
+          await handleTelegramAuth(tgData);
+        }
+      }
+
+      // --- ЗВИЧАЙНА ПЕРЕВІРКА СЕСІЇ ---
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
       setAuthLoading(false);
     };
-    checkUser();
+
+    initApp();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -990,7 +1056,6 @@ export default function Home() {
     </div>
   </div>
 )}
-
       {/* 2. Додавання креативу */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
