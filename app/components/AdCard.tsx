@@ -1,13 +1,11 @@
-'use client';
-
-import { Play, Star, FileText, Globe, ShieldCheck, Trash2 } from 'lucide-react';
+import { Star, Trash2, Lock, Play, AlignLeft, Quote, Smartphone, Layers, Smile, Mic, MessageCircle, Camera } from 'lucide-react';
 
 interface AdCardProps {
   ad: any;
-  isLocked: boolean;
+  isLocked?: boolean;
   isFavorite: boolean;
-  canPost: boolean; // Является ли юзер админом
-  formatsList: any[];
+  canPost: boolean;
+  formatsList?: any[];
   onClick: () => void;
   onToggleFavorite: (e: any) => void;
   onDelete: (e: any) => void;
@@ -15,107 +13,177 @@ interface AdCardProps {
 
 export default function AdCard({ 
   ad, 
-  isLocked, 
+  isLocked = false, 
   isFavorite, 
   canPost, 
-  formatsList, 
+  formatsList = [], 
   onClick, 
   onToggleFavorite, 
   onDelete 
 }: AdCardProps) {
   
-  // Универсальная функция получения категорий (ищет и category, и categories)
-  const getCategories = () => {
-    const cats = ad.category || ad.categories;
-    return Array.isArray(cats) ? cats : [];
+  // 1. ТОЧНИЙ ПЕРЕКЛАД (як у меню додавання)
+  const formatTranslations: Record<string, string> = {
+    'Text': 'Текстовий пост',
+    'ImageText': 'Картинка + текст',
+    'Gallery': 'Галерея (2+)',
+    'Video': 'Відео',
+    'GIF': 'GIF',
+    'Audio': 'Голосове',
+    'Circle': 'Кружок',
+    'Screenshot': 'Скріншот (виплата)'
   };
 
-  const categories = getCategories();
+  // 2. Перевіряємо, чи це відео
+  const isVideo = 
+    ad.type === 'video' || 
+    ad.format === 'Video' || 
+    (typeof ad.image === 'string' && /\.(mp4|mov|avi|webm)$/i.test(ad.image));
+
+  // 3. Перевіряємо, чи є картинка
+  const hasImage = ad.image && ad.image.length > 5;
+
+  // Отримуємо правильну іконку
+  const getFormatIcon = (formatId: string) => {
+    const found = formatsList.find(f => f.id === formatId);
+    if (found) return found.icon;
+    
+    // Запасні іконки
+    switch (formatId) {
+      case 'Text': return <AlignLeft size={14}/>;
+      case 'Video': return <Play size={14}/>;
+      case 'Gallery': return <Layers size={14}/>;
+      case 'Audio': return <Mic size={14}/>;
+      case 'Circle': return <MessageCircle size={14}/>;
+      case 'Screenshot': return <Camera size={14}/>;
+      case 'GIF': return <Smile size={14}/>;
+      default: return <Smartphone size={14}/>;
+    }
+  };
+
+  // Парсинг категорій
+  let categories: string[] = [];
+  try {
+    if (Array.isArray(ad.category)) {
+      categories = ad.category;
+    } else if (Array.isArray(ad.categories)) {
+      categories = ad.categories;
+    } else if (typeof ad.category === 'string') {
+      categories = JSON.parse(ad.category);
+    }
+  } catch (e) {
+    categories = ['Інше'];
+  }
+  const mainCategory = categories[0] || 'Інше';
+
+  // Визначаємо текст бейджа (беремо з перекладу або залишаємо як є)
+  const badgeLabel = formatTranslations[ad.format] || ad.format;
 
   return (
     <div 
-      onClick={onClick} 
-      className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer relative flex flex-col h-auto"
+      onClick={!isLocked ? onClick : undefined}
+      className={`group relative bg-white rounded-[2rem] overflow-hidden shadow-sm border border-gray-100 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 cursor-pointer ${isLocked ? 'opacity-80' : ''}`}
     >
-      
-      {/* Кнопка удаления (для админа) */}
-      {canPost && (
-        <button 
-          onClick={onDelete} 
-          className="absolute top-3 right-3 z-30 p-1.5 bg-white/80 backdrop-blur rounded-full text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-        >
-          <Trash2 size={14} />
-        </button>
-      )}
-      
-      {/* Кнопка Избранного */}
-      <button 
-        onClick={onToggleFavorite}
-        className={`absolute top-3 left-3 z-30 p-2 rounded-full backdrop-blur-md transition-all duration-300 shadow-sm ${
-          isFavorite 
-            ? 'bg-yellow-400 text-white shadow-yellow-200 scale-110' 
-            : 'bg-white/50 text-gray-400 hover:bg-white hover:text-yellow-400 opacity-0 group-hover:opacity-100'
-        }`}
-      >
-        <Star size={16} fill={isFavorite ? "currentColor" : "none"} />
-      </button>
-      
-      {/* МЕДИА БЛОК (Картинка/Видео) */}
-      <div className="bg-gray-50 relative flex items-center justify-center overflow-hidden aspect-video">
-        {isLocked && (
-          <div className="absolute inset-0 z-20 backdrop-blur-md bg-white/40 flex flex-col items-center justify-center text-center p-4">
-            <div className="w-12 h-12 bg-gray-900 text-white rounded-full flex items-center justify-center mb-2 shadow-lg animate-pulse">
-              <ShieldCheck size={24} />
+      {/* --- ВЕРХНЯ ЧАСТИНА --- */}
+      <div className="relative aspect-[4/5] bg-gray-100 overflow-hidden">
+        
+        {isLocked ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100/50 backdrop-blur-md z-10">
+            <div className="bg-white/80 p-4 rounded-full shadow-lg mb-2">
+              <Lock className="text-gray-400" size={24} />
             </div>
-            <span className="font-black text-gray-900 text-[10px] uppercase tracking-widest bg-white px-3 py-1 rounded-lg shadow-sm">
-              Тільки PRO
-            </span>
+            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Тільки PRO</span>
           </div>
+        ) : (
+          <>
+            {isVideo ? (
+               <div className="w-full h-full relative bg-black">
+                 <video 
+                   src={ad.image} 
+                   className="w-full h-full object-cover opacity-90" 
+                   muted 
+                   loop 
+                   playsInline
+                   onMouseOver={e => e.currentTarget.play()}
+                   onMouseOut={e => e.currentTarget.pause()}
+                 />
+                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover:opacity-0 transition-opacity bg-black/10">
+                    <div className="bg-white/20 backdrop-blur-sm p-3 rounded-full">
+                      <Play className="text-white fill-white" size={20} />
+                    </div>
+                 </div>
+               </div>
+            ) : hasImage ? (
+               <img 
+                 src={ad.image} 
+                 alt={ad.title}
+                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                 loading="lazy"
+               />
+            ) : (
+               // Стильна заглушка для Текстових постів
+               <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-6 flex flex-col justify-center items-center text-center relative overflow-hidden group-hover:scale-105 transition-transform duration-700">
+                  <Quote className="absolute top-4 left-4 text-white/20 rotate-180" size={60} />
+                  <Quote className="absolute bottom-4 right-4 text-white/20" size={60} />
+                  <p className="text-white font-black text-lg line-clamp-5 leading-snug z-10 drop-shadow-md">
+                    {ad.mainText || ad.description || ad.title}
+                  </p>
+                  <div className="mt-4 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full">
+                    <span className="text-[9px] font-bold text-white uppercase tracking-widest">Читати</span>
+                  </div>
+               </div>
+            )}
+
+            {(hasImage || isVideo) && (
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+            )}
+          </>
         )}
 
-        {ad.image ? (
-          ad.type === 'video' ? (
-            <video src={Array.isArray(ad.image) ? ad.image[0] : ad.image} className={`w-full h-full object-contain transition-all duration-500 ${isLocked ? 'blur-sm scale-110 grayscale-[50%]' : ''}`} muted />
-          ) : (
-            <img src={Array.isArray(ad.image) ? ad.image[0] : ad.image} className={`w-full h-full object-contain transition-all duration-500 ${isLocked ? 'blur-sm scale-110 grayscale-[50%]' : ''}`} alt="" />
-          )
-        ) : ( <div className="h-48 flex items-center justify-center w-full"><FileText className="text-purple-100" size={40} /></div> )}
+        {/* --- БЕЙДЖІ (ТЕПЕР ІДЕАЛЬНО СПІВПАДАЮТЬ З МЕНЮ) --- */}
+        <div className="absolute top-3 left-3 flex gap-1.5 z-20 max-w-[85%] flex-wrap">
+          <span className="bg-white/90 backdrop-blur-sm text-gray-800 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm whitespace-nowrap">
+            {getFormatIcon(ad.format)}
+            {badgeLabel}
+          </span>
+          {ad.geo && (
+            <span className="bg-black/50 backdrop-blur-sm text-white px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border border-white/10">
+              {ad.geo}
+            </span>
+          )}
+        </div>
+
+        {canPost && (
+          <button 
+            onClick={onDelete}
+            className="absolute top-3 right-3 p-2 bg-red-500/80 backdrop-blur-sm text-white rounded-xl hover:bg-red-600 transition-colors z-30 opacity-0 group-hover:opacity-100"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
 
-      {/* ИНФОРМАЦИЯ */}
-      <div className="p-4 bg-white relative z-10 flex flex-col gap-2">
-        <div className="flex justify-between items-start">
-            
-            <div className="flex flex-col gap-1.5 items-start">
-               {/* Формат */}
-               <div className="text-[9px] font-black text-purple-600 uppercase whitespace-nowrap bg-purple-50 px-1.5 py-0.5 rounded-md">
-                 {formatsList.find(f => f.id === ad.format)?.label || ad.format}
-               </div>
-
-               {/* 🔥 КАТЕГОРИИ (ТЕГИ) 🔥 */}
-               {categories.length > 0 && (
-                 <div className="flex flex-wrap gap-1">
-                   {categories.slice(0, 2).map((cat: any, i: number) => (
-                     <span key={i} className="text-[8px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded-md uppercase whitespace-nowrap border border-blue-100">
-                       {cat}
-                     </span>
-                   ))}
-                   {categories.length > 2 && (
-                     <span className="text-[8px] font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-md">+ {categories.length - 2}</span>
-                   )}
-                 </div>
-               )}
-            </div>
-
-            {/* ГЕО */}
-            <div className="text-[8px] font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded-md whitespace-nowrap">
-              <Globe size={8} className="inline mr-1"/>{ad.geo}
-            </div>
+      {/* --- НИЖНЯ ЧАСТИНА --- */}
+      <div className="p-5">
+        <div className="flex justify-between items-start mb-3">
+          <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest bg-purple-50 px-2 py-1 rounded-md">
+            {mainCategory}
+          </span>
+          <button 
+            onClick={onToggleFavorite}
+            className={`transition-transform active:scale-90 ${isFavorite ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-400'}`}
+          >
+            <Star size={18} fill={isFavorite ? "currentColor" : "none"} strokeWidth={2.5} />
+          </button>
         </div>
-        
-        <h3 className={`font-bold text-gray-800 text-sm line-clamp-2 leading-tight transition-all ${isLocked ? 'blur-[3px] select-none opacity-40' : ''}`}>
-          {isLocked ? "Цей контент доступний у Premium підписці" : ad.title}
+
+        <h3 className="font-black text-gray-900 text-sm leading-tight mb-2 line-clamp-2 uppercase italic">
+          {ad.title}
         </h3>
+        
+        <p className="text-gray-500 text-xs line-clamp-2 leading-relaxed font-medium">
+          {ad.mainText || ad.description}
+        </p>
       </div>
     </div>
   );

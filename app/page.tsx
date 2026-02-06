@@ -505,25 +505,53 @@ export default function Home() {
                 </div>
                 {/* ----------------------------- */}
 
-                {/* СІТКА КРЕАТИВІВ */}
+              {/* СІТКА КРЕАТИВІВ + SKELETONS */}
                 <div className="columns-2 md:columns-3 xl:columns-4 gap-4 px-2 pb-24">
-                  {filteredList.map((ad: any, index: number) => {
-                    const isLocked = !isPro && (index % 6 !== 0);
-                    return (
-                      <div key={ad.id} className="break-inside-avoid mb-4">
-                        <AdCard 
-                          ad={ad}
-                          isLocked={isLocked}
-                          isFavorite={favoriteIds.includes(ad.id)}
-                          canPost={canPost}
-                          formatsList={formatsList}
-                          onClick={() => handleAdClick(ad, isLocked, 'feed')}
-                          onToggleFavorite={(e: any) => toggleFavorite(ad.id, e)}
-                          onDelete={(e: any) => deleteAd(ad.id, e)}
-                        />
+                  {isLoading ? (
+                    // --- 💀 СКЕЛЕТОНИ (ЗАВАНТАЖЕННЯ) ---
+                    [...Array(8)].map((_, i) => (
+                      <div key={i} className="break-inside-avoid mb-4 bg-white rounded-[2rem] p-4 shadow-sm border border-gray-100">
+                        {/* Імітація картинки */}
+                        <div className="w-full aspect-[4/5] bg-gray-200 rounded-2xl mb-4 animate-pulse relative overflow-hidden">
+                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12 translate-x-[-100%] animate-[shimmer_1.5s_infinite]" />
+                        </div>
+                        {/* Імітація бейджів */}
+                        <div className="flex gap-2 mb-4">
+                          <div className="w-16 h-5 bg-gray-200 rounded-lg animate-pulse" />
+                          <div className="w-10 h-5 bg-gray-200 rounded-lg animate-pulse" />
+                        </div>
+                        {/* Імітація заголовку */}
+                        <div className="w-3/4 h-6 bg-gray-200 rounded-lg mb-3 animate-pulse" />
+                        {/* Імітація тексту */}
+                        <div className="space-y-2 mb-5">
+                          <div className="w-full h-3 bg-gray-200 rounded animate-pulse" />
+                          <div className="w-5/6 h-3 bg-gray-200 rounded animate-pulse" />
+                          <div className="w-4/6 h-3 bg-gray-200 rounded animate-pulse" />
+                        </div>
+                        {/* Імітація кнопки */}
+                        <div className="w-full h-10 bg-gray-100 rounded-xl animate-pulse" />
                       </div>
-                    );
-                  })}
+                    ))
+                  ) : (
+                    // --- ✅ РЕАЛЬНІ ПОСТИ ---
+                    filteredList.map((ad: any, index: number) => {
+                      const isLocked = !isPro && (index % 6 !== 0);
+                      return (
+                        <div key={ad.id} className="break-inside-avoid mb-4">
+                          <AdCard 
+                            ad={ad}
+                            isLocked={isLocked}
+                            isFavorite={favoriteIds.includes(ad.id)}
+                            canPost={canPost}
+                            formatsList={formatsList}
+                            onClick={() => handleAdClick(ad, isLocked, 'feed')}
+                            onToggleFavorite={(e: any) => toggleFavorite(ad.id, e)}
+                            onDelete={(e: any) => deleteAd(ad.id, e)}
+                          />
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </div>
