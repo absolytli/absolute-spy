@@ -859,149 +859,138 @@ export default function Home() {
 
       {/* --- МОДАЛКИ --- */}
       
-      {/* 1. Деталі креативу (З ПІДТРИМКОЮ ГАЛЕРЕЇ) */}
-      {selectedAd && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center lg:p-4 bg-black/90 backdrop-blur-md" onClick={() => setSelectedAd(null)}>
+      {/* 1. Деталі креативу (З ПІДТРИМКОЮ ГАЛЕРЕЇ ТА НАВІГАЦІЇ МІЖ ПОСТАМИ) */}
+{selectedAd && (
+  <div className="fixed inset-0 z-[110] flex items-center justify-center lg:p-4 bg-black/95 backdrop-blur-md" onClick={() => setSelectedAd(null)}>
+    
+    {/* --- ВЕЛИКІ ЗОВНІШНІ СТРІЛКИ (ПЕРЕМИКАННЯ МІЖ КРЕАТИВАМИ) --- */}
+    {/* Показуються тільки на ПК (lg:flex), щоб не заважати свайпам на мобілці */}
+    <div className="hidden lg:flex fixed inset-x-0 top-1/2 -translate-y-1/2 pointer-events-none justify-between px-8 z-[130]">
+      {currentViewableIndex > 0 ? (
+        <button 
+          onClick={(e) => { e.stopPropagation(); goToPrevAd(); }} 
+          className="pointer-events-auto p-5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all backdrop-blur-md border border-white/10 group"
+        >
+          <ChevronLeft size={48} className="group-hover:-translate-x-1 transition-transform" />
+        </button>
+      ) : <div />}
+
+      {currentViewableIndex < activeNavigationList.length - 1 ? (
+        <button 
+          onClick={(e) => { e.stopPropagation(); goToNextAd(); }} 
+          className="pointer-events-auto p-5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all backdrop-blur-md border border-white/10 group"
+        >
+          <ChevronRight size={48} className="group-hover:translate-x-1 transition-transform" />
+        </button>
+      ) : <div />}
+    </div>
+
+    <div 
+      onTouchStart={onTouchStart} 
+      onTouchMove={onTouchMove} 
+      onTouchEnd={onTouchEnd}
+      className="relative w-full lg:max-w-6xl h-full lg:h-[90vh] bg-white lg:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}
+    >
+      {/* Кнопка закриття (Мобільна) */}
+      <button onClick={() => setSelectedAd(null)} className="absolute top-4 right-4 z-[120] p-2 bg-black/20 backdrop-blur-md text-white rounded-full lg:hidden">
+        <X size={20} />
+      </button>
+
+      {/* МЕДІА (СЛАЙДЕР ВНУТРІШНЬОЇ ГАЛЕРЕЇ) */}
+      <div className="w-full lg:w-1/2 h-[45vh] lg:h-full bg-gray-950 flex items-center justify-center relative border-b lg:border-b-0 lg:border-r border-gray-100 group select-none">
+        {(() => {
+          const mediaUrls = selectedAd.image?.includes(',') 
+            ? selectedAd.image.split(',').map((url: string) => url.trim()).filter(Boolean)
+            : (selectedAd.image ? [selectedAd.image] : []);
           
-          <div 
-            onTouchStart={onTouchStart} 
-            onTouchMove={onTouchMove} 
-            onTouchEnd={onTouchEnd}
-            className="relative w-full lg:max-w-6xl h-full lg:h-[90vh] bg-white lg:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}
-          >
-            <button onClick={() => setSelectedAd(null)} className="absolute top-4 right-4 z-50 p-2 bg-black/20 backdrop-blur-md text-white rounded-full hover:bg-black/40 transition-all shadow-lg">
-              <X size={20} />
-            </button>
+          if (mediaUrls.length === 0) return <div className="text-gray-500 font-bold uppercase">Тільки текст</div>;
 
-            {/* МЕДІА (СЛАЙДЕР) */}
-            <div className="w-full lg:w-1/2 h-[45vh] lg:h-full bg-gray-950 flex items-center justify-center relative border-b lg:border-b-0 lg:border-r border-gray-100 group">
-              {(() => {
-                // Розбиваємо рядок на масив посилань (якщо вони через кому)
-                const mediaUrls = selectedAd.image?.includes(',') 
-                  ? selectedAd.image.split(',').map((url: string) => url.trim()).filter(Boolean)
-                  : (selectedAd.image ? [selectedAd.image] : []);
-                
-                if (mediaUrls.length === 0) return <div className="text-gray-500 font-bold uppercase">Тільки текст</div>;
+          const currentUrl = mediaUrls[currentMediaIndex] || mediaUrls[0];
+          const isVideo = /\.(mp4|mov|avi|webm)$/i.test(currentUrl) || selectedAd.type === 'video';
 
-                const currentUrl = mediaUrls[currentMediaIndex] || mediaUrls[0];
-                const isVideo = /\.(mp4|mov|avi|webm)$/i.test(currentUrl) || selectedAd.type === 'video';
-
-                return (
-                  <>
-                    {/* Відображення медіа */}
-                    {isVideo ? (
-                      <video 
-                        key={currentUrl}
-                        src={currentUrl} 
-                        className="w-full h-full object-contain" 
-                        controls 
-                        autoPlay 
-                        muted 
-                        playsInline
-                      />
-                    ) : (
-                      <img 
-                        key={currentUrl}
-                        src={currentUrl} 
-                        className="w-full h-full object-contain" 
-                        alt="Ad Content" 
-                      />
-                    )}
-
-                    {/* Стрілки керування (внутрішні, для слайдера) */}
-                    {mediaUrls.length > 1 && (
-                      <>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCurrentMediaIndex(prev => prev > 0 ? prev - 1 : mediaUrls.length - 1);
-                          }}
-                          className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-black/30 backdrop-blur-xl text-white rounded-full flex items-center justify-center hover:bg-black/60 transition-all opacity-0 group-hover:opacity-100 border border-white/10"
-                        >
-                          <ChevronLeft size={28} />
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCurrentMediaIndex(prev => prev < mediaUrls.length - 1 ? prev + 1 : 0);
-                          }}
-                          className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-black/30 backdrop-blur-xl text-white rounded-full flex items-center justify-center hover:bg-black/60 transition-all opacity-0 group-hover:opacity-100 border border-white/10"
-                        >
-                          <ChevronRight size={28} />
-                        </button>
-
-                        {/* Точки-індикатори знизу */}
-                        <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-1.5 pointer-events-none">
-                          {mediaUrls.map((_: any, i: number) => (
-                            <div 
-                              key={i} 
-                              className={`h-1.5 rounded-full transition-all duration-300 shadow-sm ${i === currentMediaIndex ? 'w-6 bg-white' : 'w-1.5 bg-white/40'}`} 
-                            />
-                          ))}
-                        </div>
-
-                        {/* Лічильник */}
-                        <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-white tracking-widest uppercase">
-                          {currentMediaIndex + 1} / {mediaUrls.length}
-                        </div>
-                      </>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-
-            {/* ІНФО */}
-            <div className="w-full lg:w-1/2 flex-1 overflow-y-auto bg-white flex flex-col p-5 md:p-10 no-scrollbar">
-              <div className="mb-5 flex items-center justify-between">
-                <div className="flex gap-2">
-                  <span className="text-[9px] font-black text-purple-600 uppercase bg-purple-50 px-2.5 py-1 rounded-md">{selectedAd.format || 'Post'}</span>
-                  <span className="text-[9px] font-black text-gray-500 uppercase bg-gray-50 px-2.5 py-1 rounded-md">{selectedAd.geo || 'World'}</span>
-                </div>
-                <div className="text-[9px] font-bold text-gray-400">
-                  {(activeNavigationList.findIndex((a: any) => a.id === selectedAd.id) + 1)} / {activeNavigationList.length}
-                </div>
-              </div>
-              {(() => {
-                  let data = selectedAd.category || selectedAd.categories;
-                  if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { data = [data]; } }
-                  const safeCategories = Array.isArray(data) ? data : [];
-                  return safeCategories.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-4">
-                       {safeCategories.map((cat: any, i: number) => (
-                         <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded text-[8px] font-black uppercase tracking-wider">#{cat}</span>
-                       ))}
-                    </div>
-                  );
-              })()}
-              <h2 className="text-xl lg:text-3xl font-black text-gray-900 mb-4 leading-tight uppercase italic">{selectedAd.title}</h2>
-              <div className="bg-gray-50 p-4 rounded-2xl mb-6">
-                <p className="text-gray-700 leading-relaxed font-medium text-sm whitespace-pre-wrap">
-                  {selectedAd.mainText || selectedAd.description}
-                </p>
-              </div>
-              {selectedAd.buttons && Array.isArray(selectedAd.buttons) && selectedAd.buttons.length > 0 && (
-                  <div className="flex flex-col gap-2 mb-6">
-                      {selectedAd.buttons.map((btn: string, i: number) => (
-                          <div key={i} className="w-full py-3 bg-white text-gray-800 rounded-xl font-bold text-center text-[10px] uppercase tracking-widest border border-gray-200 shadow-sm">{btn}</div>
-                      ))}
-                  </div>
+          return (
+            <>
+              {isVideo ? (
+                <video key={currentUrl} src={currentUrl} className="w-full h-full object-contain" controls autoPlay muted playsInline />
+              ) : (
+                <img key={currentUrl} src={currentUrl} className="w-full h-full object-contain" alt="Ad Content" />
               )}
-              <div className="mt-auto pt-6 flex gap-2">
-                <button className="flex-1 py-4 bg-purple-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-200">
-                  <Download size={16} /> Завантажити
-                </button>
-                {selectedAd.url && (
-                  <a href={selectedAd.url} target="_blank" rel="noopener noreferrer" className="flex-1 py-4 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
-                    <Share2 size={16} /> Перейти
-                  </a>
-                )}
-              </div>
-            </div>
+
+              {/* МАЛЕНЬКІ СТРІЛКИ (ГОРТАННЯ КАРУСЕЛІ КРЕАТИВУ) */}
+              {mediaUrls.length > 1 && (
+                <>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentMediaIndex(prev => prev > 0 ? prev - 1 : mediaUrls.length - 1);
+                    }}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/40 backdrop-blur-md text-white rounded-full flex items-center justify-center hover:bg-black/60 transition-all border border-white/10 z-20"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentMediaIndex(prev => prev < mediaUrls.length - 1 ? prev + 1 : 0);
+                    }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/40 backdrop-blur-md text-white rounded-full flex items-center justify-center hover:bg-black/60 transition-all border border-white/10 z-20"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+
+                  <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-white tracking-widest z-20">
+                    {currentMediaIndex + 1} / {mediaUrls.length}
+                  </div>
+                </>
+              )}
+            </>
+          );
+        })()}
+      </div>
+
+      {/* ІНФОРМАЦІЙНА ПАНЕЛЬ */}
+      <div className="w-full lg:w-1/2 flex-1 overflow-y-auto bg-white flex flex-col p-5 md:p-10 no-scrollbar">
+        <div className="mb-5 flex items-center justify-between">
+          <div className="flex gap-2">
+            <span className="text-[9px] font-black text-purple-600 uppercase bg-purple-50 px-2.5 py-1 rounded-md">{selectedAd.format || 'Post'}</span>
+            <span className="text-[9px] font-black text-gray-500 uppercase bg-gray-50 px-2.5 py-1 rounded-md">{selectedAd.geo || 'World'}</span>
+          </div>
+          <div className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
+            {currentViewableIndex + 1} / {activeNavigationList.length}
           </div>
         </div>
-      )}
-      
+
+        <h2 className="text-xl lg:text-3xl font-black text-gray-900 mb-4 leading-tight uppercase italic">{selectedAd.title}</h2>
+        
+        <div className="bg-gray-50 p-4 rounded-2xl mb-6 border border-gray-100">
+          <p className="text-gray-700 leading-relaxed font-medium text-sm whitespace-pre-wrap">
+            {selectedAd.mainText || selectedAd.description}
+          </p>
+        </div>
+
+        {selectedAd.buttons && Array.isArray(selectedAd.buttons) && selectedAd.buttons.length > 0 && (
+            <div className="flex flex-col gap-2 mb-6">
+                {selectedAd.buttons.map((btn: string, i: number) => (
+                    <div key={i} className="w-full py-3 bg-white text-gray-800 rounded-xl font-bold text-center text-[10px] uppercase tracking-widest border border-gray-200 shadow-sm">{btn}</div>
+                ))}
+            </div>
+        )}
+        
+        <div className="mt-auto pt-6 flex gap-2">
+          <button className="flex-1 py-4 bg-purple-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-200">
+            <Download size={16} /> Завантажити
+          </button>
+          {selectedAd.url && (
+            <a href={selectedAd.url} target="_blank" rel="noopener noreferrer" className="flex-1 py-4 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
+              <Share2 size={16} /> Перейти
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
       {/* 2. Додавання креативу */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
