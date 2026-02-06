@@ -179,37 +179,45 @@ export default function Home() {
 
   useEffect(() => {
     const initApp = async () => {
-      // --- ПЕРЕВІРКА TELEGRAM WEB APP ---
+      // 1. --- ПЕРЕВІРКА ТЕЛЕГРАМА (NATIVE FEEL) ---
       if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
         const tg = (window as any).Telegram.WebApp;
-        tg.ready();
-        tg.expand(); // Розгортаємо на весь екран
         
-        // Вібрація при старті (приємна дрібниця)
+        tg.ready();
+        tg.expand(); // Розгортаємо додаток на весь екран
+
+        // Додаємо фішки для відчуття "рідного" додатка
+        tg.setHeaderColor('#ffffff');      // Біла шапка (під колір сайту)
+        tg.setBackgroundColor('#f0f2f5');  // Світло-сірий фон вікна
+        tg.enableClosingConfirmation();    // Питати перед закриттям (свайпом вниз)
+        
+        // Вібрація при старті
         tg.HapticFeedback.impactOccurred('medium');
 
         const tgData = tg.initDataUnsafe?.user;
         if (tgData) {
-          // Запускаємо наш безшовний логін
+          // Автоматичний вхід, якщо дані юзера є
           await handleTelegramAuth(tgData);
         }
       }
 
-      // --- ЗВИЧАЙНА ПЕРЕВІРКА СЕСІЇ ---
+      // 2. --- ЗВИЧАЙНА ПЕРЕВІРКА СЕСІЇ (SUPABASE) ---
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
       setAuthLoading(false);
     };
 
+    // Обов'язково викликаємо функцію, яку створили вище
     initApp();
 
+    // Слухаємо зміни авторизації (якщо юзер розлогінився/залогінився)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
-
+  }, []); // Порожні дужки означають: запустити 1 раз при завантаженні
+  
   const fetchAds = async () => {
     if (!user) return;
     setIsLoading(true);
