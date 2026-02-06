@@ -1,5 +1,6 @@
 'use client';
-import AdCard from './components/AdCard.tsx';
+
+import AdCard from './components/AdCard';
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { supabase } from './lib/supabase';
@@ -15,7 +16,7 @@ export default function Home() {
   // --- СТАНИ АВТОРИЗАЦІЇ ТА НАВІГАЦІЇ ---
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('feed'); // 'feed' або 'profile'
+  const [activeTab, setActiveTab] = useState('feed'); 
 
   // --- ОСНОВНІ СТАНИ ---
   const [isLoading, setIsLoading] = useState(true);
@@ -23,35 +24,88 @@ export default function Home() {
   const [selectedAd, setSelectedAd] = useState<any>(null); 
   const [searchTerm, setSearchTerm] = useState('');
   const [ads, setAds] = useState<any[]>([]);
-  const [copied, setCopied] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [profiles, setProfiles] = useState<any[]>([]); 
   const [userProfile, setUserProfile] = useState<any>(null); 
-  const [favoriteIds, setFavoriteIds] = useState<any[]>([]); // Стан для збережених креативів ⭐️
-  const [activeNavigationList, setActiveNavigationList] = useState<any[]>([]); // Список для гортання 🧭
-  
-  // --- СТАН ДЛЯ ПОПАПА ОНБОРДИНГУ ---
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<any[]>([]); 
+  const [activeNavigationList, setActiveNavigationList] = useState<any[]>([]); 
 
+  // --- 📱 СВАЙПИ (TOUCH EVENTS) ---
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const minSwipeDistance = 50; 
+
+  const onTouchStart = (e: any) => {
+    setTouchEnd(null); 
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: any) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      goToNextAd();
+    }
+    if (isRightSwipe) {
+      goToPrevAd();
+    }
+  };
+  // -------------------------------
+
+  // --- 🧠 РОЗУМНІ КАТЕГОРІЇ (SMART CATEGORIES) ---
+  const ALL_CATEGORIES = [
+    "Гемблінг", "Беттінг", "Криптовалюта", "Вакансії", "Інвестиції", "Фінанси", 
+    "E-commerce / Товари", "Здоров’я / Краса", "Освіта", 
+    "Знайомства / Adult", "Бізнес / Заробіток", "Ігри", 
+    "Послуги", "Нерухомість", "Авто", "Інше"
+  ];
+
+  const [displayCategories, setDisplayCategories] = useState<string[]>(ALL_CATEGORIES.slice(0, 5)); 
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  const updateInterest = (category: string) => {
+    if (!category || category === 'Всі') return;
+    const saved = localStorage.getItem('category_scores');
+    let scores = saved ? JSON.parse(saved) : {};
+    scores[category] = (scores[category] || 0) + 1;
+    localStorage.setItem('category_scores', JSON.stringify(scores));
+    reorderCategories(scores);
+  };
+
+  const reorderCategories = (scores: any) => {
+    const sorted = [...ALL_CATEGORIES].sort((a, b) => {
+      const scoreA = scores[a] || 0;
+      const scoreB = scores[b] || 0;
+      return scoreB - scoreA; 
+    });
+    setDisplayCategories(sorted.slice(0, 5));
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem('category_scores');
+    if (saved) {
+      reorderCategories(JSON.parse(saved));
+    }
+  }, []);
+  // ----------------------------------------------------
+
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const workSpheresList = [
     "Affiliate-маркетинг (Telegram)", "Арбітраж трафіку (Telegram)", "Гемблінг / Беттінг (Telegram)",
     "Крипто / Інвестиції (Telegram)", "E-commerce / Товари (Telegram)", "Новинні канали",
     "SMM / Адміністрування каналів", "Продюсування Telegram-каналів", "Креативи / Дизайн / Відео", "Інше"
   ];
   const ADMIN_EMAIL = "oleynik.igor.96@gmail.com"; 
-  
-  // Список пошт модераторів (через кому)
   const MODERATORS = ["moderator@gmail.com", "partner@gmail.com"]; 
-  
-  // Перевірка: чи має право користувач додавати пости?
   const canPost = user?.email === ADMIN_EMAIL || MODERATORS.includes(user?.email);
-  
-  const categoriesList = [
-    "Гемблінг", "Беттінг", "Криптовалюта", "Вакансії", "Інвестиції", "Фінанси", 
-    "E-commerce / Товари", "Здоров’я / Краса", "Освіта", 
-    "Знайомства / Adult", "Бізнес / Заробіток", "Ігри", 
-    "Послуги", "Нерухомість", "Авто", "Інше"
-  ];
+  const categoriesList = ALL_CATEGORIES;
 
   const geoList = ["Увесь світ", "Україна", "Європа", "США / Канада", "Латам", "Азія"];
   const formatsList = [
@@ -154,18 +208,39 @@ export default function Home() {
     }
   }, [user]);
 
-  // --- 1. ФІЛЬТРАЦІЯ ---
-  const filteredAds = ads.filter((ad: any) => {
-    const searchLow = searchTerm.toLowerCase();
-    const matchesSearch = ad.title?.toLowerCase().includes(searchLow) || ad.mainText?.toLowerCase().includes(searchLow);
-    const matchesCategory = filters.category === 'Всі' || (Array.isArray(ad.category) && ad.category.includes(filters.category)) || (ad.category === filters.category);
-    const matchesFormat = filters.format === 'Всі' || ad.format === filters.format;
-    const matchesGeo = filters.geo === 'Всі' || ad.geo === filters.geo;
-    return matchesSearch && matchesCategory && matchesFormat && matchesGeo;
+  // --- ФІЛЬТРАЦІЯ ---
+  const filteredList = ads.filter((ad: any) => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = 
+      (ad.title && ad.title.toLowerCase().includes(term)) || 
+      (ad.mainText && ad.mainText.toLowerCase().includes(term)) ||
+      (ad.description && ad.description.toLowerCase().includes(term));
+
+    let matchesTopCategory = true;
+    if (activeCategory) {
+      let cats = ad.category || ad.categories;
+      if (typeof cats === 'string') { try { cats = JSON.parse(cats); } catch { cats = [cats]; } }
+      const safeCats = Array.isArray(cats) ? cats : [];
+      matchesTopCategory = safeCats.some((c: string) => c.toLowerCase() === activeCategory.toLowerCase());
+    }
+
+    let matchesSidebarCategory = true;
+    if (filters.category !== 'Всі') {
+      let cats = ad.category || ad.categories;
+      if (typeof cats === 'string') { try { cats = JSON.parse(cats); } catch { cats = [cats]; } }
+      const safeCats = Array.isArray(cats) ? cats : [];
+      matchesSidebarCategory = safeCats.some((c: string) => c.toLowerCase() === filters.category.toLowerCase());
+    }
+
+    let matchesGeo = true;
+    if (filters.geo !== 'Всі') {
+        matchesGeo = ad.geo === filters.geo;
+    }
+    return matchesSearch && matchesTopCategory && matchesSidebarCategory && matchesGeo;
   });
 
-  // --- 2. ЛОГІКА ДОСТУПУ ТА СПИСКІВ ---
   const isPro = userProfile?.subscription_tier === 'pro';
+  const filteredAds = filteredList;
   const viewableAds = filteredAds.filter((ad: any, index: number) => isPro || (index % 6 === 0));
 
   useEffect(() => {
@@ -239,6 +314,14 @@ export default function Home() {
       alert("🔒 Цей креатив доступний тільки в PRO версії!");
       return; 
     }
+    
+    // --- 🧠 РОЗУМНІ РЕКОМЕНДАЦІЇ: ВРАХОВУЄМО ПЕРЕГЛЯД ---
+    let cats = ad.category || ad.categories;
+    if (typeof cats === 'string') { try { cats = JSON.parse(cats); } catch { cats = [cats]; } }
+    const safeCategories = Array.isArray(cats) ? cats : [];
+    safeCategories.forEach((c: string) => updateInterest(c));
+    // ----------------------------------------------------
+
     if (source === 'favorites') {
       const favoritesList = ads.filter((a: any) => favoriteIds.includes(a.id));
       setActiveNavigationList(favoritesList);
@@ -271,19 +354,26 @@ export default function Home() {
     }
   };
   
-  const deleteAd = async (id: any, e: any) => {
+  const deleteAd = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm("Видалити?")) {
+    if (!confirm('Ви впевнені, що хочете видалити цей креатив з бази назавжди?')) return;
+    try {
       const { error } = await supabase.from('posts').delete().eq('id', id);
-      if (!error) setAds(ads.filter((ad: any) => ad.id !== id));
+      if (error) { throw error; }
+      setAds(prev => prev.filter(ad => ad.id !== id));
+      if (selectedAd?.id === id) { setSelectedAd(null); }
+      console.log(`Креатив з ID ${id} успішно видалено`);
+    } catch (error: any) {
+      console.error('Full error object:', error);
+      alert('Помилка при видаленні: ' + (error.message || 'Невідома помилка'));
     }
   };
-
+  
   if (authLoading && !user) return <div className="min-h-screen bg-[#f0f2f5]" />;
   if (!user) return <Auth />;
 
   return (
-    <div className="min-h-screen bg-[#f0f2f5] flex font-sans text-gray-900">
+    <div className="min-h-screen bg-[#f0f2f5] flex font-sans text-gray-900 overflow-x-hidden">
       
       {/* SIDEBAR */}
       <aside className="w-80 bg-white border-r border-gray-200 hidden lg:flex flex-col sticky h-screen top-0">
@@ -299,7 +389,6 @@ export default function Home() {
             <LayoutDashboard size={18} /> Стрічка
           </button>
           
-          {/* --- НОВАЯ КНОПКА ИЗБРАННОГО --- */}
           <button onClick={() => setActiveTab('favorites')} className={`w-full p-4 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 transition-all ${activeTab === 'favorites' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-400 hover:bg-gray-50'}`}>
             <Star size={18} /> Обране
             {favoriteIds.length > 0 && (
@@ -333,7 +422,7 @@ export default function Home() {
                 <h3 className="text-[10px] font-black uppercase text-gray-400 tracking-widest px-1">Фільтрація</h3>
                 <div className="space-y-1.5">
                 <p className="text-[9px] font-bold text-gray-400 px-1 uppercase">🔹 Категорії</p>
-                  <select value={filters.category} onChange={(e) => setFilters({...filters, category: e.target.value})} className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold outline-none">
+                  <select value={filters.category} onChange={(e) => { setFilters({...filters, category: e.target.value}); updateInterest(e.target.value); }} className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-xs font-bold outline-none">
                     <option value="Всі">Всі ніші</option>
                     {categoriesList.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
@@ -352,16 +441,16 @@ export default function Home() {
 
         <div className="p-6 border-t border-gray-100">
            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-white font-black text-xs uppercase shadow-inner">
-                {user.email?.charAt(0)}
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <p className="text-[10px] font-black text-gray-900 truncate uppercase">{user.email.split('@')[0]}</p>
-                <div className="flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                  <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Online</p>
-                </div>
-              </div>
+             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-white font-black text-xs uppercase shadow-inner">
+               {user.email?.charAt(0)}
+             </div>
+             <div className="flex-1 overflow-hidden">
+               <p className="text-[10px] font-black text-gray-900 truncate uppercase">{user.email.split('@')[0]}</p>
+               <div className="flex items-center gap-1">
+                 <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                 <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Online</p>
+               </div>
+             </div>
            </div>
            <button onClick={() => supabase.auth.signOut()} className="w-full py-3 bg-red-50 text-red-500 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-red-100 transition-all flex items-center justify-center gap-2">
              <LogOut size={14} /> Вийти
@@ -370,7 +459,7 @@ export default function Home() {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative pb-20 lg:pb-0">
         {activeTab === 'feed' ? (
           <>
             <header className="bg-white p-6 border-b border-gray-100 shadow-sm z-10">
@@ -382,31 +471,65 @@ export default function Home() {
 
             <div className="flex-1 overflow-y-auto p-8 bg-[#f8f9fc] no-scrollbar">
               <div className="max-w-5xl mx-auto">
-                {/* --- ВОТ ТУТ МЫ ЗАМЕНИЛИ СТАРЫЙ КОД НА НОВЫЙ КОМПОНЕНТ --- */}
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-10">
-                  {filteredAds.map((ad: any, index: number) => {
+                
+                {/* --- SMART KATEGORII (ТОП-5) --- */}
+                <div className="w-full mb-6 overflow-x-auto no-scrollbar">
+                  <div className="flex gap-2 min-w-max pb-2 px-1">
+                    <button 
+                      onClick={() => setActiveCategory(null)}
+                      className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all border ${
+                        activeCategory === null 
+                          ? 'bg-gray-900 text-white border-gray-900' 
+                          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      Все
+                    </button>
+                    {displayCategories.map((cat) => (
+                      <button 
+                        key={cat}
+                        onClick={() => {
+                          setActiveCategory(activeCategory === cat ? null : cat);
+                          updateInterest(cat); 
+                        }}
+                        className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all border whitespace-nowrap ${
+                          activeCategory === cat 
+                            ? 'bg-gray-900 text-white border-gray-900 shadow-md' 
+                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* ----------------------------- */}
+
+                {/* СІТКА КРЕАТИВІВ */}
+                <div className="columns-2 md:columns-3 xl:columns-4 gap-4 px-2 pb-24">
+                  {filteredList.map((ad: any, index: number) => {
                     const isLocked = !isPro && (index % 6 !== 0);
                     return (
-                      <AdCard 
-                        key={ad.id}
-                        ad={ad}
-                        isLocked={isLocked}
-                        isFavorite={favoriteIds.includes(ad.id)}
-                        canPost={canPost}
-                        formatsList={formatsList}
-                        onClick={() => handleAdClick(ad, isLocked, 'feed')}
-                        onToggleFavorite={(e) => toggleFavorite(ad.id, e)}
-                        onDelete={(e) => deleteAd(ad.id, e)}
-                      />
+                      <div key={ad.id} className="break-inside-avoid mb-4">
+                        <AdCard 
+                          ad={ad}
+                          isLocked={isLocked}
+                          isFavorite={favoriteIds.includes(ad.id)}
+                          canPost={canPost}
+                          formatsList={formatsList}
+                          onClick={() => handleAdClick(ad, isLocked, 'feed')}
+                          onToggleFavorite={(e: any) => toggleFavorite(ad.id, e)}
+                          onDelete={(e: any) => deleteAd(ad.id, e)}
+                        />
+                      </div>
                     );
                   })}
                 </div>
-                {/* --- КОНЕЦ СПИСКА --- */}
               </div>
             </div>
           </>
-          /* --- ЭКРАН ИЗБРАННОГО --- */
         ) : activeTab === 'favorites' ? (
+          /* --- ЕКРАН ОБРАНОГО --- */
           <div className="flex-1 overflow-y-auto p-8 bg-[#f8f9fc] no-scrollbar animate-in fade-in duration-300">
             <header className="mb-8 max-w-5xl mx-auto flex items-center gap-4">
                <div className="w-12 h-12 bg-yellow-100 text-yellow-500 rounded-2xl flex items-center justify-center shadow-sm">
@@ -433,8 +556,8 @@ export default function Home() {
                         canPost={canPost}
                         formatsList={formatsList}
                         onClick={() => handleAdClick(ad, false, 'favorites')}
-                        onToggleFavorite={(e) => toggleFavorite(ad.id, e)}
-                        onDelete={(e) => deleteAd(ad.id, e)}
+                        onToggleFavorite={(e: any) => toggleFavorite(ad.id, e)}
+                        onDelete={(e: any) => deleteAd(ad.id, e)}
                       />
                     );
                   })}
@@ -620,214 +743,178 @@ export default function Home() {
             </div>
           </div>
         ) : null}
+
+        {/* --- MOBILE BOTTOM NAVIGATION --- */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
+          <div className="flex items-center justify-between w-full max-w-md mx-auto px-10 py-3">
+            <button 
+              onClick={() => {
+                setActiveTab('feed');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'feed' ? 'text-purple-600' : 'text-gray-400'}`}
+            >
+              <LayoutDashboard size={22} strokeWidth={activeTab === 'feed' ? 2.5 : 2} />
+              <span className="text-[9px] font-black uppercase tracking-wider">Головна</span>
+            </button>
+
+            {canPost && (
+              <button 
+                onClick={() => setIsModalOpen(true)}
+                className="w-14 h-14 bg-gray-900 text-white rounded-2xl flex items-center justify-center shadow-lg active:scale-95 transition-transform -translate-y-4 border-4 border-white"
+              >
+                <Plus size={28} />
+              </button>
+            )}
+
+            <button 
+              onClick={() => setActiveTab('favorites')}
+              className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'favorites' ? 'text-purple-600' : 'text-gray-400'}`}
+            >
+              <Star size={22} fill={activeTab === 'favorites' ? "currentColor" : "none"} strokeWidth={2} />
+              <span className="text-[9px] font-black uppercase tracking-wider">Обране</span>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('profile')}
+              className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'profile' ? 'text-purple-600' : 'text-gray-400'}`}
+            >
+              <User size={22} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
+              <span className="text-[9px] font-black uppercase tracking-wider">Профіль</span>
+            </button>
+          </div>
+        </div>
       </main>
 
-      {/* --- МОДАЛКИ (ВСТАВЛЕНІ ПРАВИЛЬНО ПІСЛЯ MAIN) --- */}
+      {/* --- МОДАЛКИ --- */}
       
-      {/* 1. Деталі креативу */}
+      {/* 1. Деталі креативу (З ПІДТРИМКОЮ СВАЙПІВ) */}
       {selectedAd && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center lg:p-4 bg-black/90 backdrop-blur-md" onClick={() => setSelectedAd(null)}>
           
-          {/* Кнопка НАЗАД */}
-          {currentViewableIndex > 0 && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); goToPrevAd(); }} 
-              className="absolute left-4 md:left-8 z-[120] p-4 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all group hidden sm:block"
-            >
-              <ChevronLeft size={40} className="group-hover:-translate-x-1 transition-transform" />
+          <div 
+            // ДОДАНО СВАЙПИ СЮДИ 👇
+            onTouchStart={onTouchStart} 
+            onTouchMove={onTouchMove} 
+            onTouchEnd={onTouchEnd}
+            className="relative w-full lg:max-w-6xl h-full lg:h-[90vh] bg-white lg:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}
+          >
+            <button onClick={() => setSelectedAd(null)} className="absolute top-4 right-4 z-50 p-2 bg-black/20 backdrop-blur-md text-white rounded-full hover:bg-black/40 transition-all shadow-lg">
+              <X size={20} />
             </button>
-          )}
 
-          <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row relative animate-in zoom-in duration-300 max-h-[90vh]">
-            <button onClick={() => setSelectedAd(null)} className="absolute top-6 right-6 z-30 p-3 bg-gray-100 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition-all"><X /></button>
-            
-            <div className="lg:w-1/2 bg-gray-950 flex items-center justify-center">
+            {/* МЕДІА */}
+            <div className="w-full lg:w-1/2 h-[45vh] lg:h-full bg-gray-950 flex items-center justify-center relative border-b lg:border-b-0 lg:border-r border-gray-100">
               {(() => {
                 const media = Array.isArray(selectedAd.image) ? selectedAd.image : (selectedAd.image ? [selectedAd.image] : []);
                 const currentFile = media[currentMediaIndex];
                 if (media.length === 0) return <div className="text-gray-500 font-bold uppercase">Тільки текст</div>;
-                return selectedAd.type === 'video' ? (
-                  <video src={currentFile} controls className="w-full h-full object-contain" autoPlay key={currentFile} />
-                ) : (
-                  <img src={currentFile} className="w-full h-full object-contain" alt="" key={currentFile} />
+                return (
+                  selectedAd.type === 'video' || (typeof currentFile === 'string' && /\.(mp4|mov|avi)$/i.test(currentFile)) ? (
+                    <video src={currentFile} controls muted playsInline autoPlay key={currentFile} className="w-full h-full object-contain" />
+                  ) : (
+                    <img src={currentFile} className="w-full h-full object-contain" alt="" key={currentFile} />
+                  )
                 );
               })()}
+              <div className="hidden lg:block">
+                {currentViewableIndex > 0 && (
+                  <button onClick={(e) => { e.stopPropagation(); goToPrevAd(); }} className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 backdrop-blur-md text-white rounded-full hover:bg-white/20">
+                    <ChevronLeft size={24} />
+                  </button>
+                )}
+                {currentViewableIndex < activeNavigationList.length - 1 && (
+                  <button onClick={(e) => { e.stopPropagation(); goToNextAd(); }} className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 backdrop-blur-md text-white rounded-full hover:bg-white/20">
+                    <ChevronRight size={24} />
+                  </button>
+                )}
+              </div>
             </div>
-<div className="lg:w-1/2 p-12 overflow-y-auto bg-white flex flex-col">
-              <div className="mb-6 flex justify-between items-center">
+
+            {/* ІНФО */}
+            <div className="w-full lg:w-1/2 flex-1 overflow-y-auto bg-white flex flex-col p-5 md:p-10 no-scrollbar">
+              <div className="mb-5 flex items-center justify-between">
                 <div className="flex gap-2">
-                  <span className="text-[10px] font-black text-purple-600 uppercase bg-purple-50 px-3 py-1 rounded-full">{selectedAd.format}</span>
-                  <span className="text-[10px] font-black text-gray-500 uppercase bg-gray-50 px-3 py-1 rounded-full">{selectedAd.geo}</span>
+                  <span className="text-[9px] font-black text-purple-600 uppercase bg-purple-50 px-2.5 py-1 rounded-md">{selectedAd.format || 'Post'}</span>
+                  <span className="text-[9px] font-black text-gray-500 uppercase bg-gray-50 px-2.5 py-1 rounded-md">{selectedAd.geo || 'World'}</span>
                 </div>
-                {/* ЛІЧИЛЬНИК */}
-                <div className="text-[10px] font-bold text-gray-300 uppercase bg-gray-50 px-3 py-1 rounded-full">
-                  {currentViewableIndex + 1} / {activeNavigationList.length}
+                <div className="text-[9px] font-bold text-gray-400">
+                  {(activeNavigationList.findIndex((a: any) => a.id === selectedAd.id) + 1)} / {activeNavigationList.length}
                 </div>
               </div>
-
-{/* --- ВСТАВЛЯЕМ СЮДА (НАД ЗАГОЛОВКОМ) --- */}
               {(() => {
-                 // 1. Ищем данные в category ИЛИ categories
-                 const data = selectedAd.category || selectedAd.categories;
-                 // 2. Делаем массив, чтобы не было ошибок
-                 const safeCategories = Array.isArray(data) ? data : [];
-
-                 if (safeCategories.length > 0) {
-                   return (
-                     <div className="flex flex-wrap gap-2 mb-4">
-                        {safeCategories.map((cat: any, i: number) => (
-                           <span key={i} className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[9px] font-black uppercase tracking-wider">
-                             #{cat}
-                           </span>
-                        ))}
-                     </div>
-                   );
-                 }
-                 return null;
+                  let data = selectedAd.category || selectedAd.categories;
+                  if (typeof data === 'string') { try { data = JSON.parse(data); } catch (e) { data = [data]; } }
+                  const safeCategories = Array.isArray(data) ? data : [];
+                  return safeCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-4">
+                       {safeCategories.map((cat: any, i: number) => (
+                         <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-600 border border-blue-100 rounded text-[8px] font-black uppercase tracking-wider">#{cat}</span>
+                       ))}
+                    </div>
+                  );
               })()}
-
-              {/* --- УНІВЕРСАЛЬНИЙ БЛОК КАТЕГОРІЙ (Виправлений) --- */}
-              {(() => {
-                 // 1. Шукаємо дані в будь-якому з полів (одне число чи множина)
-                 const data = selectedAd.category || selectedAd.categories;
-                 // 2. Робимо з цього масив, щоб не ламалося
-                 const safeCategories = Array.isArray(data) ? data : [];
-
-                 if (safeCategories.length > 0) {
-                   return (
-                     <div className="flex flex-wrap gap-2 mb-4">
-                        {safeCategories.map((cat: any, i: number) => (
-                           <span key={i} className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[9px] font-black uppercase tracking-wider">
-                             #{cat}
-                           </span>
-                        ))}
-                     </div>
-                   );
-                 }
-                 return null;
-              })()}
-
-{/* --- ФІКС КАТЕГОРІЙ (String -> Array) --- */}
-              {(() => {
-                 let data = selectedAd.category || selectedAd.categories;
-
-                 // ВАЖЛИВО: Якщо база віддала текст замість масиву — перетворюємо його назад
-                 if (typeof data === 'string') {
-                    try {
-                      // Спробуємо перетворити рядок "['a','b']" у справжній масив
-                      const parsed = JSON.parse(data);
-                      data = parsed;
-                    } catch (e) {
-                      // Якщо це просто одне слово без дужок
-                      data = [data];
-                    }
-                 }
-
-                 // Тепер це точно масив
-                 const safeCategories = Array.isArray(data) ? data : [];
-
-                 if (safeCategories.length > 0) {
-                   return (
-                     <div className="flex flex-wrap gap-2 mb-4">
-                        {safeCategories.map((cat: any, i: number) => (
-                           <span key={i} className="px-3 py-1 bg-blue-50 text-blue-600 border border-blue-100 rounded-lg text-[9px] font-black uppercase tracking-wider">
-                             #{cat}
-                           </span>
-                        ))}
-                     </div>
-                   );
-                 }
-                 return null;
-              })()}
-
-              <h2 className="text-2xl font-black text-gray-900 uppercase italic mb-6 leading-tight">{selectedAd.title}</h2>
-              <div className="p-8 bg-gray-50 rounded-[2rem] text-sm whitespace-pre-wrap leading-relaxed flex-1 border border-gray-100">
-                {selectedAd.mainText || "Опис відсутній"}
+              <h2 className="text-xl lg:text-3xl font-black text-gray-900 mb-4 leading-tight uppercase italic">{selectedAd.title}</h2>
+              <div className="bg-gray-50 p-4 rounded-2xl mb-6">
+                <p className="text-gray-700 leading-relaxed font-medium text-sm whitespace-pre-wrap">
+                  {selectedAd.mainText || selectedAd.description}
+                </p>
               </div>
-
-              {/* --- КНОПКИ --- */}
               {selectedAd.buttons && Array.isArray(selectedAd.buttons) && selectedAd.buttons.length > 0 && (
-                 <div className="space-y-2 mt-4">
-                    {selectedAd.buttons.map((btn: any, idx: number) => (
-                       <div key={idx} className="w-full py-3 bg-[#2AABEE]/10 text-[#2AABEE] border border-[#2AABEE]/20 rounded-xl text-center text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer hover:bg-[#2AABEE] hover:text-white transition-all shadow-sm">
-                          {btn} <MousePointer2 size={14} />
-                       </div>
-                    ))}
-                 </div>
+                  <div className="flex flex-col gap-2 mb-6">
+                      {selectedAd.buttons.map((btn: string, i: number) => (
+                          <div key={i} className="w-full py-3 bg-white text-gray-800 rounded-xl font-bold text-center text-[10px] uppercase tracking-widest border border-gray-200 shadow-sm">{btn}</div>
+                      ))}
+                  </div>
               )}
+              <div className="mt-auto pt-6 flex gap-2">
+                <button className="flex-1 py-4 bg-purple-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-200">
+                  <Download size={16} /> Завантажити
+                </button>
+                {selectedAd.url && (
+                  <a href={selectedAd.url} target="_blank" rel="noopener noreferrer" className="flex-1 py-4 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
+                    <Share2 size={16} /> Перейти
+                  </a>
+                )}
+              </div>
             </div>
           </div>
-
-          {/* Кнопка ВПЕРЕД (виправлено умову) */}
-          {currentViewableIndex < activeNavigationList.length - 1 && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); goToNextAd(); }} 
-              className="absolute right-4 md:right-8 z-[120] p-4 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all group hidden sm:block"
-            >
-              <ChevronRight size={40} className="group-hover:translate-x-1 transition-transform" />
-            </button>
-          )}
         </div>
       )}
-
-      {/* 2. Додавання креативу (MAX VERSION) */}
+      
+      {/* 2. Додавання креативу */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-xl rounded-[2.5rem] p-8 animate-in zoom-in max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl">
-            
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
+          <div className="bg-white w-full max-w-xl rounded-[2.5rem] p-8 animate-in zoom-in max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
               <h2 className="font-black uppercase text-purple-600 italic text-xl">Новий креатив</h2>
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-50 rounded-full transition-colors"><X /></button>
             </div>
-
             <div className="space-y-4">
-              {/* Заголовок */}
               <div className="space-y-1">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Заголовок</p>
-                <input 
-                  type="text" 
-                  className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border border-gray-100 focus:border-purple-200 transition-colors" 
-                  value={newAd.title}
-                  onChange={(e) => setNewAd({...newAd, title: e.target.value})} 
-                />
+                <input type="text" className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border border-gray-100" value={newAd.title} onChange={(e) => setNewAd({...newAd, title: e.target.value})} />
               </div>
-              
-              {/* Текст */}
               <div className="space-y-1">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Текст посту</p>
-                <textarea 
-                  className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border border-gray-100 h-28 focus:border-purple-200 transition-colors" 
-                  value={newAd.mainText}
-                  onChange={(e) => setNewAd({...newAd, mainText: e.target.value})} 
-                />
+                <textarea className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border border-gray-100 h-28" value={newAd.mainText} onChange={(e) => setNewAd({...newAd, mainText: e.target.value})} />
               </div>
-
-              {/* Мульти-вибір категорій */}
               <div className="space-y-1">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Категорії (Можна декілька)</p>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Категорії</p>
                 <div className="flex flex-wrap gap-2 mb-2 p-2 bg-gray-50 rounded-2xl min-h-[50px] border border-gray-100">
                   {newAd.categories.map((cat: any) => (
-                    <span key={cat} className="bg-white border border-purple-100 text-purple-600 px-3 py-1 rounded-xl text-[10px] font-black uppercase flex items-center gap-1 shadow-sm">
-                      {cat}
-                      <button onClick={() => setNewAd({...newAd, categories: newAd.categories.filter((c: any) => c !== cat)})} className="hover:text-red-500"><X size={10}/></button>
+                    <span key={cat} className="bg-white border border-purple-100 text-purple-600 px-3 py-1 rounded-xl text-[10px] font-black uppercase flex items-center gap-1">
+                      {cat} <button onClick={() => setNewAd({...newAd, categories: newAd.categories.filter((c: any) => c !== cat)})}><X size={10}/></button>
                     </span>
                   ))}
-                  <select 
-                    className="bg-transparent text-xs font-bold text-gray-500 outline-none w-full mt-1" 
-                    onChange={(e) => {
-                      if (e.target.value && !newAd.categories.includes(e.target.value)) {
-                        setNewAd({...newAd, categories: [...newAd.categories, e.target.value]});
-                      }
-                      e.target.value = "";
-                    }}
-                  >
+                  <select className="bg-transparent text-xs font-bold text-gray-500 outline-none w-full" onChange={(e) => { if (e.target.value && !newAd.categories.includes(e.target.value)) setNewAd({...newAd, categories: [...newAd.categories, e.target.value]}); e.target.value = ""; }}>
                     <option value="">+ Додати категорію</option>
                     {categoriesList.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 </div>
               </div>
-
-              {/* Додавання кнопок */}
+              
+              {/* КНОПКИ (ПОВЕРНУТО) */}
               <div className="space-y-1">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Кнопки (Enter щоб додати)</p>
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
@@ -868,38 +955,25 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Вибір параметрів (Формат, ГЕО) */}
               <div className="grid grid-cols-2 gap-4">
-                 <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2 mb-1">Формат</p>
-                    <select value={newAd.format} onChange={(e) => setNewAd({...newAd, format: e.target.value})} className="w-full p-3 bg-gray-50 rounded-2xl font-bold outline-none border border-gray-100 text-xs">
+                 <div><p className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1">Формат</p>
+                    <select value={newAd.format} onChange={(e) => setNewAd({...newAd, format: e.target.value})} className="w-full p-3 bg-gray-50 rounded-2xl font-bold text-xs">
                         {formatsList.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
                     </select>
                  </div>
-                 <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2 mb-1">ГЕО</p>
-                    <select value={newAd.geo} onChange={(e) => setNewAd({...newAd, geo: e.target.value})} className="w-full p-3 bg-gray-50 rounded-2xl font-bold outline-none border border-gray-100 text-xs">
+                 <div><p className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1">ГЕО</p>
+                    <select value={newAd.geo} onChange={(e) => setNewAd({...newAd, geo: e.target.value})} className="w-full p-3 bg-gray-50 rounded-2xl font-bold text-xs">
                         {geoList.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
                  </div>
               </div>
-
-              {/* Завантаження файлу */}
               <div className="relative pt-2">
-                  <input 
-                    type="file" 
-                    id="file-upload" 
-                    className="hidden" 
-                    onChange={(e) => setNewAd({...newAd, file: e.target.files ? e.target.files[0] : null})} 
-                  />
-                  <label htmlFor="file-upload" className={`w-full p-4 rounded-2xl font-bold border-2 border-dashed flex items-center justify-center gap-2 cursor-pointer transition-all ${newAd.file ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-gray-50 border-gray-200 text-gray-400 hover:bg-gray-100'}`}>
-                      <Upload size={20} />
-                      {newAd.file ? newAd.file.name : "Завантажити медіа (Фото/Відео)"}
+                  <input type="file" id="file-upload" className="hidden" onChange={(e) => setNewAd({...newAd, file: e.target.files ? e.target.files[0] : null})} />
+                  <label htmlFor="file-upload" className={`w-full p-4 rounded-2xl font-bold border-2 border-dashed flex items-center justify-center gap-2 cursor-pointer ${newAd.file ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
+                      <Upload size={20} /> {newAd.file ? newAd.file.name : "Завантажити медіа"}
                   </label>
               </div>
-
-              {/* Кнопка відправки */}
-              <button onClick={saveNewAd} disabled={isLoading} className="w-full py-4 bg-purple-600 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl shadow-purple-600/20 hover:brightness-110 transition-all mt-4">
+              <button onClick={saveNewAd} disabled={isLoading} className="w-full py-4 bg-purple-600 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl mt-4">
                 {isLoading ? 'Збереження...' : 'ОПУБЛІКУВАТИ'}
               </button>
             </div>
@@ -907,7 +981,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* 3. Онбординг (Сфера діяльності) */}
+      {/* 3. Онбординг */}
       {showOnboarding && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-10 text-center animate-in zoom-in shadow-2xl">
@@ -916,8 +990,7 @@ export default function Home() {
             <div className="space-y-3 max-h-[50vh] overflow-y-auto no-scrollbar">
               {workSpheresList.map((sphere) => (
                 <button key={sphere} onClick={() => saveWorkSphere(sphere)} className="w-full py-4 px-6 border-2 border-gray-50 rounded-2xl font-bold text-sm text-gray-600 hover:border-purple-600 hover:text-purple-600 hover:bg-purple-50 transition-all text-left flex justify-between items-center group">
-                  {sphere}
-                  <ChevronRight size={18} className="text-gray-200 group-hover:text-purple-600 transition-colors" />
+                  {sphere} <ChevronRight size={18} className="text-gray-200 group-hover:text-purple-600" />
                 </button>
               ))}
             </div>
