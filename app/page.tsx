@@ -17,14 +17,16 @@ export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('feed'); 
-
+  
   // --- ОСНОВНІ СТАНИ ---
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false); 
   const [selectedAd, setSelectedAd] = useState<any>(null); 
   const [searchTerm, setSearchTerm] = useState('');
   const [ads, setAds] = useState<any[]>([]);
+  // Стан для слайдера галереї
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  
   const [profiles, setProfiles] = useState<any[]>([]); 
   const [userProfile, setUserProfile] = useState<any>(null); 
   const [favoriteIds, setFavoriteIds] = useState<any[]>([]); 
@@ -126,7 +128,7 @@ export default function Home() {
   const [newAd, setNewAd] = useState<any>({
     title: '', mainText: '', format: 'ImageText', categories: ['Інше'], 
     language: 'Українська', geo: 'Україна', hasEmoji: false, 
-    buttons: ['Дізнатися більше'], image: null, file: null, type: 'text' 
+    buttons: ['Дізнатися більше'], image: null, file: null, files: [], type: 'text' 
   });
 
   useEffect(() => {
@@ -276,34 +278,73 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedAd, goToNextAd, goToPrevAd]);
 
+  // --- 🔥 ОНОВЛЕНЕ ЗБЕРЕЖЕННЯ (MULTI-UPLOAD) ---
   const saveNewAd = async () => {
     if (!newAd.title) return alert("Заповніть заголовок!");
     setIsLoading(true);
+    
     try {
-      let publicUrl = null;
-      if (newAd.file) {
-        const file = newAd.file;
-        const fileName = `${Date.now()}-${Math.random()}.${file.name.split('.').pop()}`;
-        await supabase.storage.from('creatives').upload(fileName, file);
-        const { data: urlData } = supabase.storage.from('creatives').getPublicUrl(fileName);
-        publicUrl = urlData.publicUrl;
+      let finalImageUrls = "";
+
+      // 1. Якщо є файли (масив files), завантажуємо їх
+      if (newAd.files && newAd.files.length > 0) {
+        const uploadPromises = newAd.files.map(async (file: File) => {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
+            
+            // Завантаження у Supabase
+            const { error } = await supabase.storage
+              .from('creatives') // Твоя назва бакету
+              .upload(fileName, file);
+
+            if (error) throw error;
+
+            // Отримання посилання
+            const { data: urlData } = supabase.storage
+              .from('creatives')
+              .getPublicUrl(fileName);
+            
+            return urlData.publicUrl;
+        });
+
+        // Чекаємо завершення всіх завантажень
+        const urls = await Promise.all(uploadPromises);
+        finalImageUrls = urls.join(','); // Збираємо в рядок через кому
+      } else if (newAd.file) {
+        // Підтримка старого методу (на всяк випадок)
+         const file = newAd.file;
+         const fileName = `${Date.now()}-${Math.random()}.${file.name.split('.').pop()}`;
+         await supabase.storage.from('creatives').upload(fileName, file);
+         const { data: urlData } = supabase.storage.from('creatives').getPublicUrl(fileName);
+         finalImageUrls = urlData.publicUrl;
       }
+
       const activeButtons = newAd.buttons.filter((b: any) => b.trim() !== '');
+      
       const { data, error } = await supabase.from('posts').insert([{
-        title: newAd.title, mainText: newAd.mainText, format: newAd.format,
-        category: Array.from(new Set(newAd.categories)), geo: newAd.geo,
-        image: publicUrl, type: newAd.type, has_buttons: activeButtons.length > 0, buttons: activeButtons
+        title: newAd.title, 
+        mainText: newAd.mainText, 
+        format: newAd.files?.length > 1 ? 'Gallery' : (newAd.format || 'ImageText'),
+        category: Array.from(new Set(newAd.categories)), 
+        geo: newAd.geo,
+        image: finalImageUrls, // Зберігаємо список посилань
+        type: newAd.type, 
+        has_buttons: activeButtons.length > 0, 
+        buttons: activeButtons
       }]).select();
       
       if (error) throw error;
       setAds([data[0], ...ads]);
       setIsModalOpen(false);
+      // Скидання форми
       setNewAd({ title: '', mainText: '', format: 'ImageText', categories: ['Інше'], 
         language: 'Українська', geo: 'Україна', hasEmoji: false, 
-        buttons: ['Дізнатися більше'], image: null, file: null, type: 'text' 
+        buttons: ['Дізнатися більше'], image: null, file: null, files: [], type: 'text' 
       });
+      alert('Успішно опубліковано!');
+
     } catch (error: any) { 
-      alert(error.message); 
+      alert("Помилка при збереженні: " + error.message); 
     } finally { 
       setIsLoading(false); 
     }
@@ -314,6 +355,8 @@ export default function Home() {
       alert("🔒 Цей креатив доступний тільки в PRO версії!");
       return; 
     }
+    
+    setCurrentMediaIndex(0); // <-- Скидаємо слайдер на 0 при відкритті
     
     // --- 🧠 РОЗУМНІ РЕКОМЕНДАЦІЇ: ВРАХОВУЄМО ПЕРЕГЛЯД ---
     let cats = ad.category || ad.categories;
@@ -816,12 +859,11 @@ export default function Home() {
 
       {/* --- МОДАЛКИ --- */}
       
-      {/* 1. Деталі креативу (З ПІДТРИМКОЮ СВАЙПІВ) */}
+      {/* 1. Деталі креативу (З ПІДТРИМКОЮ ГАЛЕРЕЇ) */}
       {selectedAd && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center lg:p-4 bg-black/90 backdrop-blur-md" onClick={() => setSelectedAd(null)}>
           
           <div 
-            // ДОДАНО СВАЙПИ СЮДИ 👇
             onTouchStart={onTouchStart} 
             onTouchMove={onTouchMove} 
             onTouchEnd={onTouchEnd}
@@ -831,32 +873,82 @@ export default function Home() {
               <X size={20} />
             </button>
 
-            {/* МЕДІА */}
-            <div className="w-full lg:w-1/2 h-[45vh] lg:h-full bg-gray-950 flex items-center justify-center relative border-b lg:border-b-0 lg:border-r border-gray-100">
+            {/* МЕДІА (СЛАЙДЕР) */}
+            <div className="w-full lg:w-1/2 h-[45vh] lg:h-full bg-gray-950 flex items-center justify-center relative border-b lg:border-b-0 lg:border-r border-gray-100 group">
               {(() => {
-                const media = Array.isArray(selectedAd.image) ? selectedAd.image : (selectedAd.image ? [selectedAd.image] : []);
-                const currentFile = media[currentMediaIndex];
-                if (media.length === 0) return <div className="text-gray-500 font-bold uppercase">Тільки текст</div>;
+                // Розбиваємо рядок на масив посилань (якщо вони через кому)
+                const mediaUrls = selectedAd.image?.includes(',') 
+                  ? selectedAd.image.split(',').map((url: string) => url.trim()).filter(Boolean)
+                  : (selectedAd.image ? [selectedAd.image] : []);
+                
+                if (mediaUrls.length === 0) return <div className="text-gray-500 font-bold uppercase">Тільки текст</div>;
+
+                const currentUrl = mediaUrls[currentMediaIndex] || mediaUrls[0];
+                const isVideo = /\.(mp4|mov|avi|webm)$/i.test(currentUrl) || selectedAd.type === 'video';
+
                 return (
-                  selectedAd.type === 'video' || (typeof currentFile === 'string' && /\.(mp4|mov|avi)$/i.test(currentFile)) ? (
-                    <video src={currentFile} controls muted playsInline autoPlay key={currentFile} className="w-full h-full object-contain" />
-                  ) : (
-                    <img src={currentFile} className="w-full h-full object-contain" alt="" key={currentFile} />
-                  )
+                  <>
+                    {/* Відображення медіа */}
+                    {isVideo ? (
+                      <video 
+                        key={currentUrl}
+                        src={currentUrl} 
+                        className="w-full h-full object-contain" 
+                        controls 
+                        autoPlay 
+                        muted 
+                        playsInline
+                      />
+                    ) : (
+                      <img 
+                        key={currentUrl}
+                        src={currentUrl} 
+                        className="w-full h-full object-contain" 
+                        alt="Ad Content" 
+                      />
+                    )}
+
+                    {/* Стрілки керування (внутрішні, для слайдера) */}
+                    {mediaUrls.length > 1 && (
+                      <>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCurrentMediaIndex(prev => prev > 0 ? prev - 1 : mediaUrls.length - 1);
+                          }}
+                          className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-black/30 backdrop-blur-xl text-white rounded-full flex items-center justify-center hover:bg-black/60 transition-all opacity-0 group-hover:opacity-100 border border-white/10"
+                        >
+                          <ChevronLeft size={28} />
+                        </button>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCurrentMediaIndex(prev => prev < mediaUrls.length - 1 ? prev + 1 : 0);
+                          }}
+                          className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-black/30 backdrop-blur-xl text-white rounded-full flex items-center justify-center hover:bg-black/60 transition-all opacity-0 group-hover:opacity-100 border border-white/10"
+                        >
+                          <ChevronRight size={28} />
+                        </button>
+
+                        {/* Точки-індикатори знизу */}
+                        <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-1.5 pointer-events-none">
+                          {mediaUrls.map((_: any, i: number) => (
+                            <div 
+                              key={i} 
+                              className={`h-1.5 rounded-full transition-all duration-300 shadow-sm ${i === currentMediaIndex ? 'w-6 bg-white' : 'w-1.5 bg-white/40'}`} 
+                            />
+                          ))}
+                        </div>
+
+                        {/* Лічильник */}
+                        <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-white tracking-widest uppercase">
+                          {currentMediaIndex + 1} / {mediaUrls.length}
+                        </div>
+                      </>
+                    )}
+                  </>
                 );
               })()}
-              <div className="hidden lg:block">
-                {currentViewableIndex > 0 && (
-                  <button onClick={(e) => { e.stopPropagation(); goToPrevAd(); }} className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 backdrop-blur-md text-white rounded-full hover:bg-white/20">
-                    <ChevronLeft size={24} />
-                  </button>
-                )}
-                {currentViewableIndex < activeNavigationList.length - 1 && (
-                  <button onClick={(e) => { e.stopPropagation(); goToNextAd(); }} className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 backdrop-blur-md text-white rounded-full hover:bg-white/20">
-                    <ChevronRight size={24} />
-                  </button>
-                )}
-              </div>
             </div>
 
             {/* ІНФО */}
@@ -995,14 +1087,31 @@ export default function Home() {
                     </select>
                  </div>
               </div>
+              
+              {/* --- ІНПУТ ДЛЯ МУЛЬТИ-ЗАВАНТАЖЕННЯ --- */}
               <div className="relative pt-2">
-                  <input type="file" id="file-upload" className="hidden" onChange={(e) => setNewAd({...newAd, file: e.target.files ? e.target.files[0] : null})} />
-                  <label htmlFor="file-upload" className={`w-full p-4 rounded-2xl font-bold border-2 border-dashed flex items-center justify-center gap-2 cursor-pointer ${newAd.file ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
-                      <Upload size={20} /> {newAd.file ? newAd.file.name : "Завантажити медіа"}
+                <input 
+                  type="file" 
+                  id="file-upload" 
+                  className="hidden" 
+                  multiple // Дозволяє вибрати багато файлів
+                  onChange={(e) => {
+                    if (e.target.files) {
+                      const filesArray = Array.from(e.target.files);
+                      setNewAd({ ...newAd, files: filesArray, file: filesArray[0] }); 
+                    }
+                  }} 
+                />
+                  <label htmlFor="file-upload" className={`w-full p-4 rounded-2xl font-bold border-2 border-dashed flex items-center justify-center gap-2 cursor-pointer ${newAd.files?.length > 0 ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
+                      <Upload size={20} /> 
+                      {newAd.files?.length > 0 
+                        ? `Вибрано файлів: ${newAd.files.length}` 
+                        : (newAd.file ? newAd.file.name : "Завантажити медіа (можна кілька)")}
                   </label>
               </div>
+
               <button onClick={saveNewAd} disabled={isLoading} className="w-full py-4 bg-purple-600 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl mt-4">
-                {isLoading ? 'Збереження...' : 'ОПУБЛІКУВАТИ'}
+                {isLoading ? 'Завантаження...' : 'ОПУБЛІКУВАТИ'}
               </button>
             </div>
           </div>
@@ -1028,5 +1137,3 @@ export default function Home() {
     </div>
   );
 }
-// Force update v1
-// Final connect fix

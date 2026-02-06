@@ -34,14 +34,21 @@ export default function AdCard({
     'Screenshot': 'Скріншот (виплата)'
   };
 
-  // 2. Перевіряємо, чи це відео
+  // 🔥 ВИПРАВЛЕННЯ: Розбиваємо список посилань і беремо ПЕРШЕ для прев'ю
+  const mediaList = ad.image ? (ad.image.includes(',') ? ad.image.split(',') : [ad.image]) : [];
+  const previewUrl = mediaList[0] ? mediaList[0].trim() : null;
+  
+  // Перевіряємо, чи це галерея (більше 1 файлу)
+  const isGallery = mediaList.length > 1;
+
+  // 2. Перевіряємо, чи це відео (дивимось на ПЕРШИЙ файл)
   const isVideo = 
     ad.type === 'video' || 
     ad.format === 'Video' || 
-    (typeof ad.image === 'string' && /\.(mp4|mov|avi|webm)$/i.test(ad.image));
+    (previewUrl && /\.(mp4|mov|avi|webm)$/i.test(previewUrl));
 
-  // 3. Перевіряємо, чи є картинка
-  const hasImage = ad.image && ad.image.length > 5;
+  // 3. Перевіряємо, чи є картинка взагалі
+  const hasImage = !!previewUrl && previewUrl.length > 5;
 
   // Отримуємо правильну іконку
   const getFormatIcon = (formatId: string) => {
@@ -76,7 +83,7 @@ export default function AdCard({
   }
   const mainCategory = categories[0] || 'Інше';
 
-  // Визначаємо текст бейджа (беремо з перекладу або залишаємо як є)
+  // Визначаємо текст бейджа
   const badgeLabel = formatTranslations[ad.format] || ad.format;
 
   return (
@@ -98,8 +105,9 @@ export default function AdCard({
           <>
             {isVideo ? (
                <div className="w-full h-full relative bg-black">
+                 {/* Використовуємо previewUrl замість ad.image */}
                  <video 
-                   src={ad.image} 
+                   src={previewUrl} 
                    className="w-full h-full object-cover opacity-90" 
                    muted 
                    loop 
@@ -114,8 +122,9 @@ export default function AdCard({
                  </div>
                </div>
             ) : hasImage ? (
+               // Використовуємо previewUrl замість ad.image
                <img 
-                 src={ad.image} 
+                 src={previewUrl} 
                  alt={ad.title}
                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                  loading="lazy"
@@ -137,10 +146,17 @@ export default function AdCard({
             {(hasImage || isVideo) && (
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
             )}
+
+            {/* ІКОНКА ГАЛЕРЕЇ (якщо є більше 1 фото) */}
+            {isGallery && (
+               <div className="absolute top-3 right-3 z-20 bg-black/50 backdrop-blur-md p-1.5 rounded-lg text-white">
+                 <Layers size={14} />
+               </div>
+            )}
           </>
         )}
 
-        {/* --- БЕЙДЖІ (ТЕПЕР ІДЕАЛЬНО СПІВПАДАЮТЬ З МЕНЮ) --- */}
+        {/* --- БЕЙДЖІ --- */}
         <div className="absolute top-3 left-3 flex gap-1.5 z-20 max-w-[85%] flex-wrap">
           <span className="bg-white/90 backdrop-blur-sm text-gray-800 px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm whitespace-nowrap">
             {getFormatIcon(ad.format)}
@@ -156,7 +172,7 @@ export default function AdCard({
         {canPost && (
           <button 
             onClick={onDelete}
-            className="absolute top-3 right-3 p-2 bg-red-500/80 backdrop-blur-sm text-white rounded-xl hover:bg-red-600 transition-colors z-30 opacity-0 group-hover:opacity-100"
+            className="absolute bottom-3 right-3 p-2 bg-red-500/80 backdrop-blur-sm text-white rounded-xl hover:bg-red-600 transition-colors z-30 opacity-0 group-hover:opacity-100"
           >
             <Trash2 size={14} />
           </button>
