@@ -145,26 +145,23 @@ export default function Home() {
     
     setIsLoading(true);
     try {
-      // 1. Просимо наш сервер створити чек на 250 зірок
       const response = await fetch('/api/payment/invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: 'Absolute Spy PRO',
           description: 'Повний доступ на 1 місяць',
-          payload: user.id, // Передаємо ID, щоб знати, кого оновити
-          amount: 250 // Ціна в зірках (XTR)
+          payload: user.id, 
+          amount: 250 
         })
       });
 
       const data = await response.json();
       if (!data.invoiceLink) throw new Error("Не вдалося створити посилання");
 
-      // 2. Відкриваємо вікно оплати прямо в Telegram
       if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
         (window as any).Telegram.WebApp.openInvoice(data.invoiceLink, (status: string) => {
           if (status === 'paid') {
-            // Якщо оплата пройшла успішно — оновлюємо інтерфейс миттєво
             alert("🎉 Вітаємо! PRO активовано!");
             setUserProfile((prev: any) => ({ ...prev, subscription_tier: 'pro' }));
             setIsLoading(false);
@@ -173,7 +170,6 @@ export default function Home() {
           }
         });
       } else {
-        // Якщо відкрили з браузера (не з ТГ)
         window.open(data.invoiceLink, '_blank');
         setIsLoading(false);
       }
@@ -184,18 +180,61 @@ export default function Home() {
     }
   };
 
+  // --- 🔗 ФУНКЦІЯ ОБ'ЄДНАННЯ АКАУНТІВ (ВИПРАВЛЕНА) ---
+  const handleMergeAccount = async () => {
+    if (!mergeEmail || !mergePassword) return alert("Заповніть пошту та пароль!");
+    setIsLoading(true);
+
+    try {
+      const tg = (window as any).Telegram?.WebApp;
+      const tgUser = tg?.initDataUnsafe?.user;
+      
+      if (!tgUser) throw new Error("Відкрийте додаток через Telegram");
+
+      // 🔥 КРОК 1: Звільняємо Telegram ID з поточного (тимчасового) акаунту
+      // Це критично важливо, щоб уникнути помилки "duplicate key"
+      await supabase
+        .from('profiles')
+        .update({ telegram_id: null })
+        .eq('telegram_id', tgUser.id);
+
+      // 🔥 КРОК 2: Входимо в старий акаунт
+      const { data, error: loginError } = await supabase.auth.signInWithPassword({
+        email: mergeEmail,
+        password: mergePassword,
+      });
+
+      if (loginError) throw loginError;
+
+      // 🔥 КРОК 3: Прив'язуємо Telegram ID до старого акаунту
+      const { error: updateError } = await supabase.from('profiles').update({
+        telegram_id: tgUser.id,
+        avatar_url: tgUser.photo_url,
+        full_name: tgUser.first_name
+      }).eq('id', data.user.id);
+
+      if (updateError) throw updateError;
+
+      alert("✅ Акаунти успішно синхронізовано!");
+      setIsMergeModalOpen(false); 
+      window.location.reload(); 
+
+    } catch (error: any) {
+      alert("Помилка: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // --- ЛОГІКА ПРИВ'ЯЗКИ EMAIL ---
   const handleLinkEmail = async () => {
     if (!newEmail.includes('@')) return alert("Введіть коректну пошту");
     setIsLoading(true);
 
     try {
-      // 1. Відправляємо запит на зміну пошти (Прийде підтвердження)
       const { data, error } = await supabase.auth.updateUser({ email: newEmail });
-      
       if (error) throw error;
 
-      // 2. Оновлюємо також таблицю профілів (візуально)
       await supabase.from('profiles').update({ email: newEmail }).eq('id', user.id);
 
       alert(`✅ Підтвердження відправлено на ${newEmail}!\n\nОБОВ'ЯЗКОВО перейдіть за посиланням у листі, щоб завершити прив'язку.`);
@@ -218,46 +257,6 @@ export default function Home() {
       if (error) throw error;
       alert("✅ Пароль встановлено! Тепер ви можете входити на сайт за допомогою Email та цього пароля.");
       setNewPassword('');
-    } catch (error: any) {
-      alert("Помилка: " + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // --- ФУНКЦІЯ ОБ'ЄДНАННЯ (LOGIN & LINK) ---
-  const handleMergeAccount = async () => {
-    if (!mergeEmail || !mergePassword) return alert("Заповніть пошту та пароль!");
-    setIsLoading(true);
-
-    try {
-      // 1. Отримуємо дані з Telegram WebApp
-      const tg = (window as any).Telegram?.WebApp;
-      const tgUser = tg?.initDataUnsafe?.user;
-      
-      if (!tgUser) throw new Error("Відкрийте додаток через Telegram");
-
-      // 2. Авторизуємо користувача в існуючий акаунт
-      const { data, error: loginError } = await supabase.auth.signInWithPassword({
-        email: mergeEmail,
-        password: mergePassword,
-      });
-
-      if (loginError) throw loginError;
-
-      // 3. Додаємо Telegram ID до цього акаунта в таблиці profiles
-      const { error: updateError } = await supabase.from('profiles').update({
-        telegram_id: tgUser.id,
-        avatar_url: tgUser.photo_url,
-        full_name: tgUser.first_name
-      }).eq('id', data.user.id);
-
-      if (updateError) throw updateError;
-
-      alert("✅ Акаунти успішно синхронізовано!");
-      setIsMergeModalOpen(false); // Закриваємо модалку
-      window.location.reload(); // Оновлюємо, щоб підтягнути нову сесію
-
     } catch (error: any) {
       alert("Помилка: " + error.message);
     } finally {
