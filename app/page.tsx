@@ -42,6 +42,10 @@ export default function Home() {
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  // --- СТАТИ ДЛЯ ОБ'ЄДНАННЯ АКАУНТІВ ---
+  const [isMergeMode, setIsMergeMode] = useState(false); // Чи показувати форму вводу
+  const [mergeEmail, setMergeEmail] = useState('');      // Сюди пишемо стару пошту
+  const [mergePassword, setMergePassword] = useState(''); // Сюди пишемо старий пароль
 
   // --- 📱 СВАЙПИ ---
   const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -213,6 +217,45 @@ export default function Home() {
       if (error) throw error;
       alert("✅ Пароль встановлено! Тепер ви можете входити на сайт за допомогою Email та цього пароля.");
       setNewPassword('');
+    } catch (error: any) {
+      alert("Помилка: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- ФУНКЦІЯ ОБ'ЄДНАННЯ (LOGIN & LINK) ---
+  const handleMergeAccount = async () => {
+    if (!mergeEmail || !mergePassword) return alert("Заповніть пошту та пароль!");
+    setIsLoading(true);
+
+    try {
+      // 1. Отримуємо дані з Telegram WebApp
+      const tg = (window as any).Telegram?.WebApp;
+      const tgUser = tg?.initDataUnsafe?.user;
+      
+      if (!tgUser) throw new Error("Відкрийте додаток через Telegram");
+
+      // 2. Авторизуємо користувача в існуючий акаунт
+      const { data, error: loginError } = await supabase.auth.signInWithPassword({
+        email: mergeEmail,
+        password: mergePassword,
+      });
+
+      if (loginError) throw loginError;
+
+      // 3. Додаємо Telegram ID до цього акаунта в таблиці profiles
+      const { error: updateError } = await supabase.from('profiles').update({
+        telegram_id: tgUser.id,
+        avatar_url: tgUser.photo_url,
+        full_name: tgUser.first_name
+      }).eq('id', data.user.id);
+
+      if (updateError) throw updateError;
+
+      alert("✅ Акаунти успішно синхронізовано!");
+      window.location.reload(); // Оновлюємо, щоб підтягнути нову сесію
+
     } catch (error: any) {
       alert("Помилка: " + error.message);
     } finally {
@@ -588,6 +631,45 @@ export default function Home() {
               <ShieldCheck size={20} /> Адмінка
             </button>
           )}
+
+          {/* --- НОВИЙ БЛОК СИНХРОНІЗАЦІЇ --- */}
+                    <div className="mt-8 p-6 bg-blue-50 rounded-[2.5rem] border border-blue-100 shadow-inner">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="p-2 bg-blue-600 text-white rounded-lg"><Globe size={18} /></div>
+                        <h3 className="font-black text-blue-900 uppercase text-[10px] tracking-widest">Синхронізація з ПК</h3>
+                      </div>
+
+                      {!isMergeMode ? (
+                        <button 
+                          onClick={() => setIsMergeMode(true)}
+                          className="w-full py-4 bg-white text-blue-600 rounded-2xl text-[10px] font-black uppercase border border-blue-200 hover:shadow-lg transition-all"
+                        >
+                          У мене вже є акаунт на сайті
+                        </button>
+                      ) : (
+                        <div className="space-y-3 animate-in fade-in zoom-in duration-200">
+                          <input 
+                            type="email" 
+                            placeholder="Ваш Email на сайті"
+                            className="w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-xs font-bold outline-none"
+                            value={mergeEmail}
+                            onChange={(e) => setMergeEmail(e.target.value)}
+                          />
+                          <input 
+                            type="password" 
+                            placeholder="Ваш Пароль"
+                            className="w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-xs font-bold outline-none"
+                            value={mergePassword}
+                            onChange={(e) => setMergePassword(e.target.value)}
+                          />
+                          <div className="flex gap-2">
+                            <button onClick={handleMergeAccount} className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase">Увійти та прив'язати</button>
+                            <button onClick={() => setIsMergeMode(false)} className="px-4 py-3 bg-gray-200 text-gray-500 rounded-xl"><X size={18}/></button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {/* ------------------------------- */}
 
           <div className="mt-auto pt-6 border-t border-white/10">
             <button onClick={() => supabase.auth.signOut()} className="flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl w-full">
