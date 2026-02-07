@@ -633,43 +633,57 @@ export default function Home() {
           )}
 
           {/* --- НОВИЙ БЛОК СИНХРОНІЗАЦІЇ --- */}
-                    <div className="mt-8 p-6 bg-blue-50 rounded-[2.5rem] border border-blue-100 shadow-inner">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-blue-600 text-white rounded-lg"><Globe size={18} /></div>
-                        <h3 className="font-black text-blue-900 uppercase text-[10px] tracking-widest">Синхронізація з ПК</h3>
-                      </div>
+<div className="mt-8 p-6 bg-blue-50 rounded-[2.5rem] border border-blue-100 shadow-inner">
+  <div className="flex items-center gap-3 mb-4">
+    <div className="p-2 bg-blue-600 text-white rounded-lg"><Globe size={18} /></div>
+    <h3 className="font-black text-blue-900 uppercase text-[10px] tracking-widest">Синхронізація з ПК</h3>
+  </div>
 
-                      {!isMergeMode ? (
-                        <button 
-                          onClick={() => setIsMergeMode(true)}
-                          className="w-full py-4 bg-white text-blue-600 rounded-2xl text-[10px] font-black uppercase border border-blue-200 hover:shadow-lg transition-all"
-                        >
-                          У мене вже є акаунт на сайті
-                        </button>
-                      ) : (
-                        <div className="space-y-3 animate-in fade-in zoom-in duration-200">
-                          <input 
-                            type="email" 
-                            placeholder="Ваш Email на сайті"
-                            className="w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-xs font-bold outline-none"
-                            value={mergeEmail}
-                            onChange={(e) => setMergeEmail(e.target.value)}
-                          />
-                          <input 
-                            type="password" 
-                            placeholder="Ваш Пароль"
-                            className="w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-xs font-bold outline-none"
-                            value={mergePassword}
-                            onChange={(e) => setMergePassword(e.target.value)}
-                          />
-                          <div className="flex gap-2">
-                            <button onClick={handleMergeAccount} className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase">Увійти та прив'язати</button>
-                            <button onClick={() => setIsMergeMode(false)} className="px-4 py-3 bg-gray-200 text-gray-500 rounded-xl"><X size={18}/></button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {/* ------------------------------- */}
+  {!isMergeMode ? (
+    <button 
+      onClick={() => setIsMergeMode(true)}
+      className="w-full py-4 bg-white text-blue-600 rounded-2xl text-[10px] font-black uppercase border border-blue-200 hover:shadow-lg transition-all"
+    >
+      У мене вже є акаунт на сайті
+    </button>
+  ) : (
+    <div className="space-y-3 animate-in fade-in zoom-in duration-200">
+      <input 
+        type="email" 
+        placeholder="Ваш Email на сайті"
+        className="w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-xs font-bold outline-none"
+        value={mergeEmail}
+        onChange={(e) => setMergeEmail(e.target.value)}
+        // 👇 ДОДАЛИ ЦЕ: автоматичне фокусування
+        onFocus={(e) => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+      />
+      <input 
+        type="password" 
+        placeholder="Ваш Пароль"
+        className="w-full bg-white border border-blue-200 rounded-xl px-4 py-3 text-xs font-bold outline-none"
+        value={mergePassword}
+        onChange={(e) => setMergePassword(e.target.value)}
+        // 👇 ДОДАЛИ ЦЕ: автоматичне фокусування
+        onFocus={(e) => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+      />
+      <div className="flex gap-2">
+        <button 
+          onClick={handleMergeAccount} 
+          className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase active:scale-95 transition-all"
+        >
+          Увійти та прив'язати
+        </button>
+        <button 
+          onClick={() => setIsMergeMode(false)} 
+          className="px-4 py-3 bg-gray-200 text-gray-500 rounded-xl hover:bg-gray-300 transition-all"
+        >
+          <X size={18}/>
+        </button>
+      </div>
+    </div>
+  )}
+</div>
+{/* ------------------------------- */}
 
           <div className="mt-auto pt-6 border-t border-white/10">
             <button onClick={() => supabase.auth.signOut()} className="flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl w-full">
