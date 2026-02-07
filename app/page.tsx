@@ -38,7 +38,7 @@ export default function Home() {
   const [favoriteIds, setFavoriteIds] = useState<any[]>([]); 
   const [activeNavigationList, setActiveNavigationList] = useState<any[]>([]); 
 
-  // --- 📧 ПРИВ'ЯЗКА ПОШТИ ТА ПАРОЛЯ (HYBRID LOGIN) ---
+  // --- 📧 ПРИВ'ЯЗКА ПОШТИ ТА ПАРОЛЯ ---
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -139,7 +139,7 @@ export default function Home() {
     buttons: ['Дізнатися більше'], image: null, file: null, files: [], type: 'text' 
   });
 
-  // --- ⭐️ ФУНКЦІЯ ОПЛАТИ (TELEGRAM STARS) ---
+  // --- ⭐️ ФУНКЦІЯ ОПЛАТИ ---
   const handleBuyPro = async () => {
     if (!user) return alert("Спочатку увійдіть!");
     
@@ -180,7 +180,7 @@ export default function Home() {
     }
   };
 
-  // --- 🔗 ФУНКЦІЯ ОБ'ЄДНАННЯ АКАУНТІВ (ВИПРАВЛЕНА) ---
+  // --- 🔗 ФУНКЦІЯ ОБ'ЄДНАННЯ АКАУНТІВ (ВИПРАВЛЕНА ЛОГІКА) ---
   const handleMergeAccount = async () => {
     if (!mergeEmail || !mergePassword) return alert("Заповніть пошту та пароль!");
     setIsLoading(true);
@@ -188,17 +188,15 @@ export default function Home() {
     try {
       const tg = (window as any).Telegram?.WebApp;
       const tgUser = tg?.initDataUnsafe?.user;
-      
       if (!tgUser) throw new Error("Відкрийте додаток через Telegram");
 
-      // 🔥 КРОК 1: Звільняємо Telegram ID з поточного (тимчасового) акаунту
-      // Це критично важливо, щоб уникнути помилки "duplicate key"
+      // 1. Відв'язуємо TG ID від поточного тимчасового акаунта
       await supabase
         .from('profiles')
         .update({ telegram_id: null })
         .eq('telegram_id', tgUser.id);
 
-      // 🔥 КРОК 2: Входимо в старий акаунт
+      // 2. Входимо в основний акаунт
       const { data, error: loginError } = await supabase.auth.signInWithPassword({
         email: mergeEmail,
         password: mergePassword,
@@ -206,7 +204,7 @@ export default function Home() {
 
       if (loginError) throw loginError;
 
-      // 🔥 КРОК 3: Прив'язуємо Telegram ID до старого акаунту
+      // 3. Прив'язуємо TG ID до основного акаунта
       const { error: updateError } = await supabase.from('profiles').update({
         telegram_id: tgUser.id,
         avatar_url: tgUser.photo_url,
@@ -216,8 +214,17 @@ export default function Home() {
       if (updateError) throw updateError;
 
       alert("✅ Акаунти успішно синхронізовано!");
-      setIsMergeModalOpen(false); 
-      window.location.reload(); 
+      
+      // 🔥 ВАЖЛИВО: Ми НЕ перезавантажуємо сторінку, а просто оновлюємо стан
+      setUser(data.user); // Перемикаємо користувача в React
+      setIsMergeModalOpen(false); // Закриваємо модалку
+      
+      // Оновлюємо дані вже для НОВОГО користувача
+      setTimeout(() => {
+        fetchAds();
+        fetchFavorites();
+        checkUserProfile();
+      }, 500);
 
     } catch (error: any) {
       alert("Помилка: " + error.message);
@@ -307,7 +314,19 @@ export default function Home() {
 
   useEffect(() => {
     const initApp = async () => {
-      if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
+      // 1. Спочатку перевіряємо, чи є вже активна сесія (щоб не перезаходити в тимчасовий акаунт)
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      let shouldRunTgAuth = true;
+
+      // Якщо ми вже залогінені, і це нормальна пошта (не tg_...), то не треба запускати авто-вхід телеграма
+      if (session?.user?.email && !session.user.email.startsWith('tg_')) {
+         shouldRunTgAuth = false;
+         setUser(session.user);
+         setAuthLoading(false);
+      }
+
+      if (shouldRunTgAuth && typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
         const tg = (window as any).Telegram.WebApp;
         tg.ready();
         tg.expand();
@@ -318,11 +337,11 @@ export default function Home() {
 
         const tgData = tg.initDataUnsafe?.user;
         if (tgData) await handleTelegramAuth(tgData);
+      } else if (!session) {
+         // Якщо немає ні сесії, ні телеграма - просто вантажимось
+         setUser(null);
+         setAuthLoading(false);
       }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      setAuthLoading(false);
     };
 
     initApp();
@@ -1319,20 +1338,6 @@ export default function Home() {
                   </label>
               </div>
               <button onClick={saveNewAd} disabled={isLoading} className="w-full py-4 bg-purple-600 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl mt-4">{isLoading ? 'Завантаження...' : 'ОПУБЛІКУВАТИ'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showOnboarding && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-10 text-center animate-in zoom-in shadow-2xl">
-            <div className="text-5xl mb-4 animate-bounce">👋</div>
-            <h2 className="text-2xl font-black text-gray-900 mb-6 leading-tight">У якій сфері ти працюєш у Telegram?</h2>
-            <div className="space-y-3 max-h-[50vh] overflow-y-auto no-scrollbar">
-              {workSpheresList.map((sphere) => (
-                <button key={sphere} onClick={() => saveWorkSphere(sphere)} className="w-full py-4 px-6 border-2 border-gray-50 rounded-2xl font-bold text-sm text-gray-600 hover:border-purple-600 hover:text-purple-600 hover:bg-purple-50 transition-all text-left flex justify-between items-center group">{sphere} <ChevronRight size={18} className="text-gray-200 group-hover:text-purple-600" /></button>
-              ))}
             </div>
           </div>
         </div>
