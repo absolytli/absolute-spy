@@ -28,7 +28,7 @@ export default function Auth() {
     if (!tgUser) return;
     setLoading(true);
     try {
-      const fakeEmail = `tg_${tgUser.id}@absolute-spy.internal`;
+      const fakeEmail = `tg_${tgUser.id}@absolutespy.com`;
       const fakePassword = `secret_pass_${tgUser.id}_secure`;
 
       const { error: signInError } = await supabase.auth.signInWithPassword({

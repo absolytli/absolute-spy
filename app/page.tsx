@@ -222,7 +222,7 @@ export default function Home() {
 
   const handleTelegramAuth = async (tgUser: any) => {
     try {
-      const tgEmail = `tg_${tgUser.id}@absolute-spy.internal`;
+      const tgEmail = `tg_${tgUser.id}@absolutespy.com`;
       const tgPassword = `tg_pass_${tgUser.id}_secret_key`; 
 
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
