@@ -1059,20 +1059,64 @@ export default function Home() {
                       </div>
                     </div>
                     
-                    {/* --- КНОПКА СИНХРОНІЗАЦІЇ --- */}
-                    <div className="p-6 bg-blue-50 rounded-[2rem] border border-blue-100 shadow-inner mb-6">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="p-2 bg-blue-600 text-white rounded-lg"><Globe size={16} /></div>
-                        <p className="text-[10px] font-black text-blue-900 uppercase tracking-widest">Синхронізація</p>
-                      </div>
-                      <p className="text-[9px] font-bold text-blue-700/60 mb-4 uppercase">Вже маєте акаунт? Прив'яжіть його тут.</p>
-                      <button 
-                        onClick={() => setIsMergeModalOpen(true)} 
-                        className="w-full py-3 bg-white text-blue-600 rounded-xl text-[10px] font-black uppercase border border-blue-200 shadow-sm active:scale-95 transition-all"
-                      >
-                        🔗 Увійти в існуючий акаунт
-                      </button>
-                    </div>
+                    {/* --- БЛОК СИНХРОНИЗАЦИИ (УМНЫЙ) --- */}
+{userProfile?.telegram_id ? (
+  // 🟢 ВАРИАНТ 1: Если Telegram уже привязан
+  <div className="p-6 bg-green-50 rounded-[2rem] border border-green-100 shadow-sm mb-6 relative overflow-hidden">
+    <div className="absolute top-0 right-0 p-4 opacity-10 text-green-600">
+      <ShieldCheck size={80} />
+    </div>
+    
+    <div className="flex items-center gap-3 mb-4 relative z-10">
+      <div className="p-2 bg-green-500 text-white rounded-xl shadow-lg shadow-green-200">
+        <Check size={18} strokeWidth={3} />
+      </div>
+      <div>
+        <p className="text-[10px] font-black text-green-700 uppercase tracking-widest">Telegram Під'єднано</p>
+        <p className="text-[9px] font-bold text-green-600/70 uppercase">Синхронізація активна</p>
+      </div>
+    </div>
+
+    <div className="bg-white/60 backdrop-blur-sm p-4 rounded-xl border border-green-100/50 relative z-10">
+      <div className="flex items-center gap-3">
+        {/* Аватарка из Телеграма (если есть) */}
+        {userProfile.avatar_url ? (
+          <img src={userProfile.avatar_url} alt="TG Avatar" className="w-10 h-10 rounded-full border-2 border-white shadow-sm" />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold">TG</div>
+        )}
+        
+        <div className="overflow-hidden">
+          {/* Имя из Телеграма */}
+          <p className="text-xs font-black text-gray-800 truncate">
+            {userProfile.full_name || 'Користувач Telegram'}
+          </p>
+          {/* Telegram ID */}
+          <p className="text-[9px] font-bold text-gray-400 font-mono mt-0.5">
+            ID: {userProfile.telegram_id}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+) : (
+  // 🔵 ВАРИАНТ 2: Если Telegram НЕ привязан (Кнопка)
+  <div className="p-6 bg-blue-50 rounded-[2rem] border border-blue-100 shadow-inner mb-6">
+    <div className="flex items-center gap-3 mb-3">
+      <div className="p-2 bg-blue-600 text-white rounded-lg"><Globe size={16} /></div>
+      <p className="text-[10px] font-black text-blue-900 uppercase tracking-widest">Синхронізація</p>
+    </div>
+    <p className="text-[9px] font-bold text-blue-700/60 mb-4 uppercase leading-relaxed">
+      Вже маєте акаунт на сайті? Увійдіть, щоб об'єднати дані.
+    </p>
+    <button 
+      onClick={() => setIsMergeModalOpen(true)} 
+      className="w-full py-3 bg-white text-blue-600 rounded-xl text-[10px] font-black uppercase border border-blue-200 shadow-sm active:scale-95 transition-all hover:shadow-md"
+    >
+      🔗 Увійти в існуючий акаунт
+    </button>
+  </div>
+)}
 
                     <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 pb-8 border-b border-gray-50">
                       <div>
