@@ -42,6 +42,12 @@ export default function Home() {
   const [isEditingEmail, setIsEditingEmail] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+
+  // Состояния для модального окна синхронизации
+  const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
+  const [mergeEmail, setMergeEmail] = useState('');
+  const [mergePassword, setMergePassword] = useState('');
+
   // --- СТАТИ ДЛЯ ОБ'ЄДНАННЯ АКАУНТІВ ---
   const [isMergeMode, setIsMergeMode] = useState(false); // Чи показувати форму вводу
   const [mergeEmail, setMergeEmail] = useState('');      // Сюди пишемо стару пошту
@@ -179,6 +185,46 @@ export default function Home() {
 
     } catch (error: any) {
       alert("Помилка: " + error.message);
+      setIsLoading(false);
+    }
+  };
+
+  // --- 🔗 ФУНКЦІЯ ОБ'ЄДНАННЯ АКАУНТІВ (НОВА) ---
+  const handleMergeAccount = async () => {
+    // 1. Перевіряємо, чи ввів юзер дані в модальному вікні
+    if (!mergeEmail || !mergePassword) return alert("Будь ласка, заповніть всі поля!");
+    
+    setIsLoading(true);
+    try {
+      // 2. Отримуємо Telegram ID поточного користувача
+      const tg = (window as any).Telegram?.WebApp;
+      const tgUser = tg?.initDataUnsafe?.user;
+      if (!tgUser) throw new Error("Відкрийте додаток через Telegram");
+
+      // 3. Пробуємо залогінитись в існуючий (старий) акаунт через пошту і пароль
+      const { data, error: loginError } = await supabase.auth.signInWithPassword({
+        email: mergeEmail,
+        password: mergePassword,
+      });
+
+      if (loginError) throw loginError;
+
+      // 4. Якщо пароль вірний — записуємо Telegram ID у цей старий профіль
+      const { error: updateError } = await supabase.from('profiles').update({
+        telegram_id: tgUser.id,
+        avatar_url: tgUser.photo_url,
+        full_name: tgUser.first_name
+      }).eq('id', data.user.id);
+
+      if (updateError) throw updateError;
+
+      alert("✅ Акаунти успішно синхронізовано!");
+      setIsMergeModalOpen(false); // Закриваємо модалку
+      window.location.reload();   // Оновлюємо сторінку, щоб підтягнути старі дані
+
+    } catch (error: any) {
+      alert("Помилка: " + error.message);
+    } finally {
       setIsLoading(false);
     }
   };
