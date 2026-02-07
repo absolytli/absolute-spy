@@ -1,40 +1,116 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Send, Sparkles, Lock, Mail } from 'lucide-react';
+import { Send, Sparkles, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 
 export default function Auth() {
   const [loading, setLoading] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false); // Перемикач Вхід / Реєстрація
   const [email, setEmail] = useState('');
-  const [isSent, setIsSent] = useState(false);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  
+  const [tgUser, setTgUser] = useState<any>(null);
 
-  const handleLogin = async (e: any) => {
+  useEffect(() => {
+    // Перевірка Telegram середовища
+    if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
+      const tg = (window as any).Telegram.WebApp;
+      tg.ready();
+      const user = tg.initDataUnsafe?.user;
+      if (user) setTgUser(user);
+    }
+  }, []);
+
+  // --- ВХІД ЧЕРЕЗ TELEGRAM (АВТОМАТИЧНО) ---
+  const handleTelegramLogin = async () => {
+    if (!tgUser) return;
+    setLoading(true);
+    try {
+      const fakeEmail = `tg_${tgUser.id}@absolute-spy.internal`;
+      const fakePassword = `secret_pass_${tgUser.id}_secure`;
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: fakeEmail,
+        password: fakePassword,
+      });
+
+      if (signInError) {
+        // Якщо немає - реєструємо
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: fakeEmail,
+          password: fakePassword,
+          options: {
+            data: {
+              full_name: `${tgUser.first_name} ${tgUser.last_name || ''}`.trim(),
+              telegram_id: tgUser.id,
+              username: tgUser.username,
+              avatar_url: tgUser.photo_url
+            }
+          }
+        });
+        if (signUpError) throw signUpError;
+        
+        // Створюємо профіль
+        await supabase.from('profiles').upsert({
+          id: (await supabase.auth.getUser()).data.user?.id,
+          email: fakeEmail,
+          telegram_id: tgUser.id,
+          full_name: `${tgUser.first_name} ${tgUser.last_name || ''}`.trim(),
+          username: tgUser.username,
+          avatar_url: tgUser.photo_url
+        });
+      }
+    } catch (error: any) {
+      alert("Помилка входу через TG: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- ВХІД / РЕЄСТРАЦІЯ ЧЕРЕЗ EMAIL + PASSWORD ---
+  const handleAuth = async (e: any) => {
     e.preventDefault();
     setLoading(true);
-    
-    // Використовуємо Magic Link (вхід без пароля, по пошті)
-    // Це найпростіший і найнадійніший спосіб
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-      },
-    });
 
-    if (error) {
+    try {
+      if (isSignUp) {
+        // РЕЄСТРАЦІЯ
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+        
+        // Створюємо профіль для нового юзера
+        if (data.user) {
+           await supabase.from('profiles').insert([{
+             id: data.user.id,
+             email: email,
+             full_name: email.split('@')[0],
+           }]);
+           alert("🎉 Реєстрація успішна! Тепер увійдіть.");
+           setIsSignUp(false); // Перемикаємо на вхід
+        }
+      } else {
+        // ВХІД
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
+      }
+    } catch (error: any) {
       alert(error.message);
-    } else {
-      setIsSent(true);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#f0f2f5] flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-md p-8 rounded-[2.5rem] shadow-2xl animate-in zoom-in duration-300 relative overflow-hidden">
-        
-        {/* Декоративний фон */}
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 to-purple-600" />
         
         <div className="text-center mb-8">
@@ -45,23 +121,32 @@ export default function Auth() {
             Absolute <span className="text-[#7000FF]">Spy</span>
           </h1>
           <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-2">
-            Вхід в систему
+            {tgUser ? 'Швидкий вхід' : (isSignUp ? 'Створення акаунту' : 'Вхід в систему')}
           </p>
         </div>
 
-        {isSent ? (
-          <div className="text-center space-y-4 py-8">
-            <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto animate-bounce">
-              <Sparkles size={32} />
+        {tgUser ? (
+          <div className="text-center space-y-6">
+             <div className="flex flex-col items-center">
+              {tgUser.photo_url ? (
+                <img src={tgUser.photo_url} alt="User" className="w-20 h-20 rounded-full border-4 border-purple-100 shadow-lg mb-3" />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-purple-400 to-blue-500 flex items-center justify-center text-white text-2xl font-bold mb-3 shadow-lg">
+                  {tgUser.first_name[0]}
+                </div>
+              )}
+              <h2 className="text-xl font-black text-gray-900">Привіт, {tgUser.first_name}! 👋</h2>
             </div>
-            <h3 className="text-xl font-bold text-gray-900">Перевірте пошту!</h3>
-            <p className="text-gray-500 text-sm">Ми відправили магічне посилання на <strong>{email}</strong>.</p>
-            <button onClick={() => setIsSent(false)} className="text-[#7000FF] font-bold text-xs uppercase hover:underline">
-              Ввести іншу пошту
+            <button
+              onClick={handleTelegramLogin}
+              disabled={loading}
+              className="w-full h-14 bg-[#7000FF] text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-purple-600/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              {loading ? 'Заходимо...' : <><Sparkles size={18} /> Продовжити</>}
             </button>
           </div>
         ) : (
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleAuth} className="space-y-4">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Email</label>
               <div className="relative">
@@ -69,25 +154,45 @@ export default function Auth() {
                 <input
                   type="email"
                   placeholder="name@example.com"
-                  className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 outline-none focus:border-[#7000FF] focus:ring-4 focus:ring-[#7000FF]/10 transition-all font-bold text-gray-900 placeholder:text-gray-400"
+                  className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 outline-none focus:border-[#7000FF] focus:ring-4 focus:ring-[#7000FF]/10 transition-all font-bold text-gray-900"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </div>
-              {/* text-gray-900 — це колір тексту (ЧОРНИЙ), який виправить проблему */}
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Пароль</label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-12 outline-none focus:border-[#7000FF] focus:ring-4 focus:ring-[#7000FF]/10 transition-all font-bold text-gray-900"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
 
             <button
               disabled={loading}
-              className="w-full h-14 bg-[#7000FF] text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-purple-600/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+              className="w-full h-14 bg-gray-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
             >
-              {loading ? 'Відправка...' : 'Отримати посилання для входу'}
+              {loading ? 'Обробка...' : (isSignUp ? 'ЗАРЕЄСТРУВАТИСЯ' : 'УВІЙТИ')}
             </button>
-
-            <p className="text-center text-[10px] text-gray-400 font-bold uppercase mt-6">
-              Ми використовуємо вхід без пароля для максимальної безпеки 🔒
-            </p>
+            
+            <div className="text-center">
+              <button type="button" onClick={() => setIsSignUp(!isSignUp)} className="text-[#7000FF] text-xs font-bold uppercase hover:underline">
+                {isSignUp ? 'Вже є акаунт? Увійти' : 'Немає акаунту? Реєстрація'}
+              </button>
+            </div>
           </form>
         )}
       </div>

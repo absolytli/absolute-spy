@@ -38,6 +38,11 @@ export default function Home() {
   const [favoriteIds, setFavoriteIds] = useState<any[]>([]); 
   const [activeNavigationList, setActiveNavigationList] = useState<any[]>([]); 
 
+  // --- 📧 ПРИВ'ЯЗКА ПОШТИ ТА ПАРОЛЯ (HYBRID LOGIN) ---
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+
   // --- 📱 СВАЙПИ ---
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
@@ -128,6 +133,92 @@ export default function Home() {
     language: 'Українська', geo: 'Україна', hasEmoji: false, 
     buttons: ['Дізнатися більше'], image: null, file: null, files: [], type: 'text' 
   });
+
+  // --- ⭐️ ФУНКЦІЯ ОПЛАТИ (TELEGRAM STARS) ---
+  const handleBuyPro = async () => {
+    if (!user) return alert("Спочатку увійдіть!");
+    
+    setIsLoading(true);
+    try {
+      // 1. Просимо наш сервер створити чек на 250 зірок
+      const response = await fetch('/api/payment/invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Absolute Spy PRO',
+          description: 'Повний доступ на 1 місяць',
+          payload: user.id, // Передаємо ID, щоб знати, кого оновити
+          amount: 250 // Ціна в зірках (XTR)
+        })
+      });
+
+      const data = await response.json();
+      if (!data.invoiceLink) throw new Error("Не вдалося створити посилання");
+
+      // 2. Відкриваємо вікно оплати прямо в Telegram
+      if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
+        (window as any).Telegram.WebApp.openInvoice(data.invoiceLink, (status: string) => {
+          if (status === 'paid') {
+            // Якщо оплата пройшла успішно — оновлюємо інтерфейс миттєво
+            alert("🎉 Вітаємо! PRO активовано!");
+            setUserProfile((prev: any) => ({ ...prev, subscription_tier: 'pro' }));
+            setIsLoading(false);
+          } else {
+            setIsLoading(false);
+          }
+        });
+      } else {
+        // Якщо відкрили з браузера (не з ТГ)
+        window.open(data.invoiceLink, '_blank');
+        setIsLoading(false);
+      }
+
+    } catch (error: any) {
+      alert("Помилка: " + error.message);
+      setIsLoading(false);
+    }
+  };
+
+  // --- ЛОГІКА ПРИВ'ЯЗКИ EMAIL ---
+  const handleLinkEmail = async () => {
+    if (!newEmail.includes('@')) return alert("Введіть коректну пошту");
+    setIsLoading(true);
+
+    try {
+      // 1. Відправляємо запит на зміну пошти (Прийде підтвердження)
+      const { data, error } = await supabase.auth.updateUser({ email: newEmail });
+      
+      if (error) throw error;
+
+      // 2. Оновлюємо також таблицю профілів (візуально)
+      await supabase.from('profiles').update({ email: newEmail }).eq('id', user.id);
+
+      alert(`✅ Підтвердження відправлено на ${newEmail}!\n\nОБОВ'ЯЗКОВО перейдіть за посиланням у листі, щоб завершити прив'язку.`);
+      setIsEditingEmail(false);
+      setNewEmail('');
+      
+    } catch (error: any) {
+      alert("Помилка: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- ЛОГІКА ВСТАНОВЛЕННЯ ПАРОЛЯ ---
+  const handleSetPassword = async () => {
+    if (newPassword.length < 6) return alert("Пароль має бути мінімум 6 символів");
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      alert("✅ Пароль встановлено! Тепер ви можете входити на сайт за допомогою Email та цього пароля.");
+      setNewPassword('');
+    } catch (error: any) {
+      alert("Помилка: " + error.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleTelegramAuth = async (tgUser: any) => {
     try {
@@ -840,12 +931,77 @@ export default function Home() {
                     <h3 className="font-black text-gray-900 uppercase tracking-tight text-sm">Параметри користувача</h3>
                 </div>
                 <div className="p-8 space-y-8">
+                    
+                    {/* --- БЛОК EMAIL З МОЖЛИВІСТЮ ЗМІНИ --- */}
                     <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 pb-8 border-b border-gray-50">
-                      <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Логін (Email)</p>
-                        <p className="text-sm font-bold text-gray-800">{user.email}</p>
+                      <div className="flex-1">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                          Логін (Email)
+                        </p>
+                        
+                        {isEditingEmail ? (
+                          <div className="flex gap-2 mt-2">
+                            <input 
+                              type="email" 
+                              placeholder="vash_email@gmail.com"
+                              className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none w-full max-w-[250px]"
+                              value={newEmail}
+                              onChange={(e) => setNewEmail(e.target.value)}
+                            />
+                            <button onClick={handleLinkEmail} className="bg-green-500 text-white p-2 rounded-xl hover:bg-green-600 transition-colors">
+                              <Check size={18} />
+                            </button>
+                            <button onClick={() => setIsEditingEmail(false)} className="bg-gray-200 text-gray-500 p-2 rounded-xl hover:bg-gray-300 transition-colors">
+                              <X size={18} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-gray-800 break-all">
+                              {user.email}
+                            </p>
+                            {/* Якщо пошта фейкова (починається на tg_), показуємо кнопку прив'язки */}
+                            {user.email?.startsWith('tg_') && (
+                              <span className="bg-yellow-100 text-yellow-700 text-[9px] font-black px-2 py-0.5 rounded uppercase">
+                                Тимчасова
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {!isEditingEmail && user.email?.startsWith('tg_') && (
+                        <button 
+                          onClick={() => setIsEditingEmail(true)} 
+                          className="px-5 py-2.5 bg-blue-50 text-[9px] font-black uppercase rounded-xl text-blue-600 hover:bg-blue-100 transition-colors flex items-center gap-2 whitespace-nowrap"
+                        >
+                          <Globe size={14} /> Прив'язати Email
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* --- БЛОК ВСТАНОВЛЕННЯ ПАРОЛЯ --- */}
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 pb-8 border-b border-gray-50">
+                      <div className="flex-1">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                          Пароль для сайту
+                        </p>
+                        <div className="flex gap-2 mt-2">
+                           <input 
+                              type="password" 
+                              placeholder="Новий пароль (мін. 6 симв.)"
+                              className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none w-full max-w-[250px]"
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                            />
+                           <button onClick={handleSetPassword} className="bg-purple-600 text-white px-4 py-2 rounded-xl font-bold text-xs uppercase hover:bg-purple-700 transition-colors">
+                             Зберегти
+                           </button>
+                        </div>
+                        <p className="text-[9px] text-gray-400 font-bold mt-2">Встановіть пароль, щоб заходити з комп'ютера без Telegram.</p>
                       </div>
                     </div>
+                    {/* --------------------------------- */}
 
                     <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 pb-8 border-b border-gray-50">
                       <div>
@@ -863,7 +1019,13 @@ export default function Home() {
                         </p>
                       </div>
                       {userProfile?.subscription_tier !== 'pro' && (
-                        <button className="px-5 py-2.5 bg-purple-600 text-white text-[9px] font-black uppercase rounded-xl hover:bg-purple-700 transition-all shadow-lg shadow-purple-200">Купити PRO</button>
+                        <button 
+                          onClick={handleBuyPro} 
+                          disabled={isLoading}
+                          className="px-5 py-2.5 bg-purple-600 text-white text-[9px] font-black uppercase rounded-xl hover:bg-purple-700 transition-all shadow-lg shadow-purple-200 flex items-center gap-2"
+                        >
+                          {isLoading ? 'Завантаження...' : 'Купити PRO (250 ⭐️)'}
+                        </button>
                       )}
                     </div>
 
