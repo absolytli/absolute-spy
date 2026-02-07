@@ -7,10 +7,11 @@ import Link from 'next/link';
 import { supabase } from './lib/supabase';
 import Auth from './components/Auth'; 
 
-// Об'єднаний імпорт іконок (без дублікатів + додали Sparkles)
+// Об'єднаний імпорт іконок
 import { 
   Sparkles, // ✨ Наша нова іконка для AI Studio
-  Search, Filter, X, ChevronDown, Star, // Ті, що були в першому рядку
+  Menu, // 🍔 Іконка бургер-меню
+  Search, Filter, X, ChevronDown, Star,
   Send, Play, Download, ChevronLeft, ChevronRight, Plus, Upload, Trash2,
   AlignLeft, MousePointer2, PlusCircle, FileText, Tag, Copy, Check, 
   Smartphone, MessageCircle, Mic, Share2, Globe, Camera, Smile, Layers, LogOut,
@@ -23,6 +24,9 @@ export default function Home() {
   const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('feed'); 
   
+  // --- СТАН МОБІЛЬНОГО МЕНЮ ---
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // --- ОСНОВНІ СТАНИ ---
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false); 
@@ -136,20 +140,17 @@ export default function Home() {
     buttons: ['Дізнатися більше'], image: null, file: null, files: [], type: 'text' 
   });
 
-// Функція для автоматичного входу через Telegram
+  // Функція для автоматичного входу через Telegram
   const handleTelegramAuth = async (tgUser: any) => {
     try {
-      // Створюємо унікальний email та пароль на основі Telegram ID
       const tgEmail = `tg_${tgUser.id}@absolute-spy.internal`;
       const tgPassword = `tg_pass_${tgUser.id}_secret_key`; 
 
-      // 1. Пробуємо увійти
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: tgEmail,
         password: tgPassword,
       });
 
-      // 2. Якщо юзера немає — реєструємо
       if (signInError) {
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email: tgEmail,
@@ -168,7 +169,6 @@ export default function Home() {
         setUser(signInData.user);
       }
 
-      // 3. Синхронізуємо з таблицею профілів
       await supabase.from('profiles').upsert({
         id: (signInData.user || (await supabase.auth.getUser()).data.user)?.id,
         email: tgEmail,
@@ -184,44 +184,34 @@ export default function Home() {
 
   useEffect(() => {
     const initApp = async () => {
-      // 1. --- ПЕРЕВІРКА ТЕЛЕГРАМА (NATIVE FEEL) ---
       if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
         const tg = (window as any).Telegram.WebApp;
-        
         tg.ready();
-        tg.expand(); // Розгортаємо додаток на весь екран
-
-        // Додаємо фішки для відчуття "рідного" додатка
-        tg.setHeaderColor('#ffffff');      // Біла шапка (під колір сайту)
-        tg.setBackgroundColor('#f0f2f5');  // Світло-сірий фон вікна
-        tg.enableClosingConfirmation();    // Питати перед закриттям (свайпом вниз)
-        
-        // Вібрація при старті
+        tg.expand();
+        tg.setHeaderColor('#ffffff');
+        tg.setBackgroundColor('#f0f2f5');
+        tg.enableClosingConfirmation();
         tg.HapticFeedback.impactOccurred('medium');
 
         const tgData = tg.initDataUnsafe?.user;
         if (tgData) {
-          // Автоматичний вхід, якщо дані юзера є
           await handleTelegramAuth(tgData);
         }
       }
 
-      // 2. --- ЗВИЧАЙНА ПЕРЕВІРКА СЕСІЇ (SUPABASE) ---
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
       setAuthLoading(false);
     };
 
-    // Обов'язково викликаємо функцію, яку створили вище
     initApp();
 
-    // Слухаємо зміни авторизації (якщо юзер розлогінився/залогінився)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
-  }, []); // Порожні дужки означають: запустити 1 раз при завантаженні
+  }, []);
   
   const fetchAds = async () => {
     if (!user) return;
@@ -357,7 +347,6 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedAd, goToNextAd, goToPrevAd]);
 
-  // --- 🔥 ОНОВЛЕНЕ ЗБЕРЕЖЕННЯ (MULTI-UPLOAD) ---
   const saveNewAd = async () => {
     if (!newAd.title) return alert("Заповніть заголовок!");
     setIsLoading(true);
@@ -365,32 +354,21 @@ export default function Home() {
     try {
       let finalImageUrls = "";
 
-      // 1. Якщо є файли (масив files), завантажуємо їх
       if (newAd.files && newAd.files.length > 0) {
         const uploadPromises = newAd.files.map(async (file: File) => {
             const fileExt = file.name.split('.').pop();
             const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
             
-            // Завантаження у Supabase
-            const { error } = await supabase.storage
-              .from('creatives') // Твоя назва бакету
-              .upload(fileName, file);
-
+            const { error } = await supabase.storage.from('creatives').upload(fileName, file);
             if (error) throw error;
 
-            // Отримання посилання
-            const { data: urlData } = supabase.storage
-              .from('creatives')
-              .getPublicUrl(fileName);
-            
+            const { data: urlData } = supabase.storage.from('creatives').getPublicUrl(fileName);
             return urlData.publicUrl;
         });
 
-        // Чекаємо завершення всіх завантажень
         const urls = await Promise.all(uploadPromises);
-        finalImageUrls = urls.join(','); // Збираємо в рядок через кому
+        finalImageUrls = urls.join(',');
       } else if (newAd.file) {
-        // Підтримка старого методу (на всяк випадок)
          const file = newAd.file;
          const fileName = `${Date.now()}-${Math.random()}.${file.name.split('.').pop()}`;
          await supabase.storage.from('creatives').upload(fileName, file);
@@ -406,7 +384,7 @@ export default function Home() {
         format: newAd.files?.length > 1 ? 'Gallery' : (newAd.format || 'ImageText'),
         category: Array.from(new Set(newAd.categories)), 
         geo: newAd.geo,
-        image: finalImageUrls, // Зберігаємо список посилань
+        image: finalImageUrls, 
         type: newAd.type, 
         has_buttons: activeButtons.length > 0, 
         buttons: activeButtons
@@ -415,7 +393,6 @@ export default function Home() {
       if (error) throw error;
       setAds([data[0], ...ads]);
       setIsModalOpen(false);
-      // Скидання форми
       setNewAd({ title: '', mainText: '', format: 'ImageText', categories: ['Інше'], 
         language: 'Українська', geo: 'Україна', hasEmoji: false, 
         buttons: ['Дізнатися більше'], image: null, file: null, files: [], type: 'text' 
@@ -435,14 +412,12 @@ export default function Home() {
       return; 
     }
     
-    setCurrentMediaIndex(0); // <-- Скидаємо слайдер на 0 при відкритті
+    setCurrentMediaIndex(0); 
     
-    // --- 🧠 РОЗУМНІ РЕКОМЕНДАЦІЇ: ВРАХОВУЄМО ПЕРЕГЛЯД ---
     let cats = ad.category || ad.categories;
     if (typeof cats === 'string') { try { cats = JSON.parse(cats); } catch { cats = [cats]; } }
     const safeCategories = Array.isArray(cats) ? cats : [];
     safeCategories.forEach((c: string) => updateInterest(c));
-    // ----------------------------------------------------
 
     if (source === 'favorites') {
       const favoritesList = ads.filter((a: any) => favoriteIds.includes(a.id));
@@ -497,7 +472,61 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#f0f2f5] flex font-sans text-gray-900 overflow-x-hidden">
       
-      {/* SIDEBAR */}
+      {/* 1. --- 🍔 МОБІЛЬНЕ МЕНЮ (ШТОРКА) --- */}
+      {/* Це меню з'являється тільки при натисканні на кнопку бургер */}
+      <div className={`fixed inset-0 z-[200] flex transition-opacity duration-300 lg:hidden ${isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        
+        {/* Затемнення фону */}
+        <div 
+          className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+
+        {/* Сама панель */}
+        <div className={`relative w-[85%] max-w-[320px] h-full bg-[#0a0a0a] border-r border-white/10 p-6 flex flex-col gap-2 transition-transform duration-300 transform shadow-2xl ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          
+          <button onClick={() => setIsMobileMenuOpen(false)} className="absolute top-5 right-5 text-gray-400 hover:text-white"><X size={24} /></button>
+
+          <div className="flex items-center gap-3 mb-10 px-2">
+             <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center font-bold text-xl text-white">AS</div>
+             <span className="text-white font-bold text-lg">Absolute Spy</span>
+          </div>
+
+          {/* ПУНКТИ МЕНЮ */}
+          <Link href="/studio" className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-blue-400 border border-blue-500/30 rounded-xl mb-4" onClick={() => setIsMobileMenuOpen(false)}>
+            <Sparkles size={20} className="animate-pulse" />
+            <span className="font-bold">AI Studio</span>
+            <span className="ml-auto bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded font-bold">NEW</span>
+          </Link>
+
+          <button onClick={() => { setActiveTab('feed'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'feed' ? 'bg-white/10 text-white' : 'text-gray-400'}`}>
+            <LayoutDashboard size={20} /> Стрічка
+          </button>
+
+          <button onClick={() => { setActiveTab('favorites'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'favorites' ? 'bg-white/10 text-white' : 'text-gray-400'}`}>
+            <Star size={20} /> Обране
+          </button>
+
+          <button onClick={() => { setActiveTab('profile'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'profile' ? 'bg-white/10 text-white' : 'text-gray-400'}`}>
+            <User size={20} /> Мій кабінет
+          </button>
+
+          {user?.email === ADMIN_EMAIL && (
+            <button onClick={() => { setActiveTab('admin'); setIsMobileMenuOpen(false); }} className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-white/10 hover:text-white">
+              <ShieldCheck size={20} /> Адмінка
+            </button>
+          )}
+
+          <div className="mt-auto pt-6 border-t border-white/10">
+            <button onClick={() => supabase.auth.signOut()} className="flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 rounded-xl w-full">
+              <LogOut size={20} /> Вийти
+            </button>
+          </div>
+        </div>
+      </div>
+
+
+      {/* 2. --- SIDEBAR (ДЛЯ КОМП'ЮТЕРІВ) --- */}
       <aside className="w-80 bg-white border-r border-gray-200 hidden lg:flex flex-col sticky h-screen top-0">
         <div className="p-6 border-b border-gray-100 flex items-center gap-3">
           <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-600/10">
@@ -511,7 +540,7 @@ export default function Home() {
             <LayoutDashboard size={18} /> Стрічка
           </button>
           
-          {/* --- КНОПКА AI STUDIO --- */}
+          {/* КНОПКА AI STUDIO */}
           <Link 
             href="/studio" 
             className="w-full p-4 mb-3 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 transition-all bg-gradient-to-r from-[#7000FF]/10 to-blue-600/10 text-[#7000FF] border border-[#7000FF]/20 hover:bg-[#7000FF] hover:text-white group"
@@ -522,7 +551,6 @@ export default function Home() {
               NEW
             </span>
           </Link>
-          {/* ------------------------- */}
 
           <button onClick={() => setActiveTab('favorites')} className={`w-full p-4 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 transition-all ${activeTab === 'favorites' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-400 hover:bg-gray-50'}`}>
             <Star size={18} /> Обране
@@ -595,16 +623,39 @@ export default function Home() {
 
       {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative pb-20 lg:pb-0">
+        
+        {/* 3. --- Мобільна Шапка (Тільки на телефонах) --- */}
+        <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-gray-100">
+           <div className="flex items-center gap-2">
+             {/* Кнопка Бургера 🍔 */}
+             <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 hover:bg-gray-100 rounded-lg">
+               <Menu size={24} />
+             </button>
+             <span className="font-black text-lg text-purple-600 uppercase italic">Absolute Spy</span>
+           </div>
+           {/* Можна додати аватарку або пошук тут */}
+        </div>
+
+
         {activeTab === 'feed' ? (
           <>
-            <header className="bg-white p-6 border-b border-gray-100 shadow-sm z-10">
+            <header className="bg-white p-6 border-b border-gray-100 shadow-sm z-10 hidden lg:block">
+              {/* Desktop Header */}
               <div className="max-w-4xl mx-auto relative group">
                 <Search className="absolute left-5 top-4 text-gray-300 group-focus-within:text-purple-600" size={20} />
                 <input type="text" placeholder="Пошук..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full h-14 bg-gray-100 rounded-2xl pl-14 pr-6 font-bold text-gray-700 outline-none focus:bg-white focus:ring-4 focus:ring-purple-600/5 transition-all" />
               </div>
             </header>
+            
+            {/* Мобільний пошук (окремо, під шапкою) */}
+            <div className="lg:hidden p-4 bg-white border-b border-gray-100">
+               <div className="relative">
+                 <Search className="absolute left-4 top-3 text-gray-300" size={18} />
+                 <input type="text" placeholder="Пошук..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full h-10 bg-gray-100 rounded-xl pl-10 pr-4 text-sm font-bold outline-none" />
+               </div>
+            </div>
 
-            <div className="flex-1 overflow-y-auto p-8 bg-[#f8f9fc] no-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 lg:p-8 bg-[#f8f9fc] no-scrollbar">
               <div className="max-w-5xl mx-auto">
                 
                 {/* --- SMART KATEGORII (ТОП-5) --- */}
@@ -738,7 +789,7 @@ export default function Home() {
             </div>
           </div>
         ) : activeTab === 'profile' ? (
-          <div className="flex-1 overflow-y-auto p-12 bg-[#f8f9fc] no-scrollbar animate-in fade-in duration-500">
+          <div className="flex-1 overflow-y-auto p-8 lg:p-12 bg-[#f8f9fc] no-scrollbar animate-in fade-in duration-500">
             <div className="max-w-4xl mx-auto">
               <header className="mb-12">
                 <h1 className="text-4xl font-black text-gray-900 tracking-tighter uppercase italic">Особистий кабінет</h1>
@@ -907,7 +958,7 @@ export default function Home() {
           </div>
         ) : null}
 
-        {/* --- MOBILE BOTTOM NAVIGATION --- */}
+        {/* --- MOBILE BOTTOM NAVIGATION (Залишив для зручності) --- */}
         <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between w-full max-w-md mx-auto px-10 py-3">
             <button 
@@ -951,12 +1002,10 @@ export default function Home() {
 
       {/* --- МОДАЛКИ --- */}
       
-      {/* 1. Деталі креативу (З ПІДТРИМКОЮ ГАЛЕРЕЇ ТА НАВІГАЦІЇ МІЖ ПОСТАМИ) */}
+      {/* 1. Деталі креативу */}
 {selectedAd && (
   <div className="fixed inset-0 z-[110] flex items-center justify-center lg:p-4 bg-black/95 backdrop-blur-md" onClick={() => setSelectedAd(null)}>
     
-    {/* --- ВЕЛИКІ ЗОВНІШНІ СТРІЛКИ (ПЕРЕМИКАННЯ МІЖ КРЕАТИВАМИ) --- */}
-    {/* Показуються тільки на ПК (lg:flex), щоб не заважати свайпам на мобілці */}
     <div className="hidden lg:flex fixed inset-x-0 top-1/2 -translate-y-1/2 pointer-events-none justify-between px-8 z-[130]">
       {currentViewableIndex > 0 ? (
         <button 
@@ -983,12 +1032,10 @@ export default function Home() {
       onTouchEnd={onTouchEnd}
       className="relative w-full lg:max-w-6xl h-full lg:h-[90vh] bg-white lg:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}
     >
-      {/* Кнопка закриття (Мобільна) */}
       <button onClick={() => setSelectedAd(null)} className="absolute top-4 right-4 z-[120] p-2 bg-black/20 backdrop-blur-md text-white rounded-full lg:hidden">
         <X size={20} />
       </button>
 
-      {/* МЕДІА (СЛАЙДЕР ВНУТРІШНЬОЇ ГАЛЕРЕЇ) */}
       <div className="w-full lg:w-1/2 h-[45vh] lg:h-full bg-gray-950 flex items-center justify-center relative border-b lg:border-b-0 lg:border-r border-gray-100 group select-none">
         {(() => {
           const mediaUrls = selectedAd.image?.includes(',') 
@@ -1008,7 +1055,6 @@ export default function Home() {
                 <img key={currentUrl} src={currentUrl} className="w-full h-full object-contain" alt="Ad Content" />
               )}
 
-              {/* МАЛЕНЬКІ СТРІЛКИ (ГОРТАННЯ КАРУСЕЛІ КРЕАТИВУ) */}
               {mediaUrls.length > 1 && (
                 <>
                   <button 
@@ -1040,7 +1086,6 @@ export default function Home() {
         })()}
       </div>
 
-      {/* ІНФОРМАЦІЙНА ПАНЕЛЬ */}
       <div className="w-full lg:w-1/2 flex-1 overflow-y-auto bg-white flex flex-col p-5 md:p-10 no-scrollbar">
         <div className="mb-5 flex items-center justify-between">
           <div className="flex gap-2">
@@ -1114,7 +1159,6 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* КНОПКИ (ПОВЕРНУТО) */}
               <div className="space-y-1">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Кнопки (Enter щоб додати)</p>
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
@@ -1168,13 +1212,12 @@ export default function Home() {
                  </div>
               </div>
               
-              {/* --- ІНПУТ ДЛЯ МУЛЬТИ-ЗАВАНТАЖЕННЯ --- */}
               <div className="relative pt-2">
                 <input 
                   type="file" 
                   id="file-upload" 
                   className="hidden" 
-                  multiple // Дозволяє вибрати багато файлів
+                  multiple
                   onChange={(e) => {
                     if (e.target.files) {
                       const filesArray = Array.from(e.target.files);
