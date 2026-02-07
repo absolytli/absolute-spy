@@ -31,7 +31,8 @@ export default function RootLayout({
           strategy="beforeInteractive" 
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}>
+      {/* ЗМІНИВ bg-black на bg-[#f0f2f5] і text-white на text-gray-900 */}
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#f0f2f5] text-gray-900`}>
         <main className="min-h-screen">
           {children}
         </main>

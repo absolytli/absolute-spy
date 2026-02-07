@@ -9,9 +9,7 @@ import Auth from './components/Auth';
 
 // Об'єднаний імпорт іконок
 import { 
-  Sparkles, // ✨ Наша нова іконка для AI Studio
-  Menu, // 🍔 Іконка бургер-меню
-  Search, Filter, X, ChevronDown, Star,
+  Sparkles, Menu, Search, Filter, X, ChevronDown, Star,
   Send, Play, Download, ChevronLeft, ChevronRight, Plus, Upload, Trash2,
   AlignLeft, MousePointer2, PlusCircle, FileText, Tag, Copy, Check, 
   Smartphone, MessageCircle, Mic, Share2, Globe, Camera, Smile, Layers, LogOut,
@@ -33,7 +31,6 @@ export default function Home() {
   const [selectedAd, setSelectedAd] = useState<any>(null); 
   const [searchTerm, setSearchTerm] = useState('');
   const [ads, setAds] = useState<any[]>([]);
-  // Стан для слайдера галереї
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   
   const [profiles, setProfiles] = useState<any[]>([]); 
@@ -41,7 +38,7 @@ export default function Home() {
   const [favoriteIds, setFavoriteIds] = useState<any[]>([]); 
   const [activeNavigationList, setActiveNavigationList] = useState<any[]>([]); 
 
-  // --- 📱 СВАЙПИ (TOUCH EVENTS) ---
+  // --- 📱 СВАЙПИ ---
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const minSwipeDistance = 50; 
@@ -61,16 +58,11 @@ export default function Home() {
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
 
-    if (isLeftSwipe) {
-      goToNextAd();
-    }
-    if (isRightSwipe) {
-      goToPrevAd();
-    }
+    if (isLeftSwipe) goToNextAd();
+    if (isRightSwipe) goToPrevAd();
   };
-  // -------------------------------
 
-  // --- 🧠 РОЗУМНІ КАТЕГОРІЇ (SMART CATEGORIES) ---
+  // --- 🧠 РОЗУМНІ КАТЕГОРІЇ ---
   const ALL_CATEGORIES = [
     "Гемблінг", "Беттінг", "Криптовалюта", "Вакансії", "Інвестиції", "Фінанси", 
     "E-commerce / Товари", "Здоров’я / Краса", "Освіта", 
@@ -101,11 +93,8 @@ export default function Home() {
 
   useEffect(() => {
     const saved = localStorage.getItem('category_scores');
-    if (saved) {
-      reorderCategories(JSON.parse(saved));
-    }
+    if (saved) reorderCategories(JSON.parse(saved));
   }, []);
-  // ----------------------------------------------------
 
   const [showOnboarding, setShowOnboarding] = useState(false);
   const workSpheresList = [
@@ -140,7 +129,6 @@ export default function Home() {
     buttons: ['Дізнатися більше'], image: null, file: null, files: [], type: 'text' 
   });
 
-  // Функція для автоматичного входу через Telegram
   const handleTelegramAuth = async (tgUser: any) => {
     try {
       const tgEmail = `tg_${tgUser.id}@absolute-spy.internal`;
@@ -194,9 +182,7 @@ export default function Home() {
         tg.HapticFeedback.impactOccurred('medium');
 
         const tgData = tg.initDataUnsafe?.user;
-        if (tgData) {
-          await handleTelegramAuth(tgData);
-        }
+        if (tgData) await handleTelegramAuth(tgData);
       }
 
       const { data: { session } } = await supabase.auth.getSession();
@@ -304,9 +290,7 @@ export default function Home() {
     }
 
     let matchesGeo = true;
-    if (filters.geo !== 'Всі') {
-        matchesGeo = ad.geo === filters.geo;
-    }
+    if (filters.geo !== 'Всі') matchesGeo = ad.geo === filters.geo;
     return matchesSearch && matchesTopCategory && matchesSidebarCategory && matchesGeo;
   });
 
@@ -473,26 +457,23 @@ export default function Home() {
     <div className="min-h-screen bg-[#f0f2f5] flex font-sans text-gray-900 overflow-x-hidden">
       
       {/* 1. --- 🍔 МОБІЛЬНЕ МЕНЮ (ШТОРКА) --- */}
-      {/* Це меню з'являється тільки при натисканні на кнопку бургер */}
       <div className={`fixed inset-0 z-[200] flex transition-opacity duration-300 lg:hidden ${isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
         
-        {/* Затемнення фону */}
         <div 
           className="absolute inset-0 bg-black/80 backdrop-blur-sm"
           onClick={() => setIsMobileMenuOpen(false)}
         />
 
-        {/* Сама панель */}
         <div className={`relative w-[85%] max-w-[320px] h-full bg-[#0a0a0a] border-r border-white/10 p-6 flex flex-col gap-2 transition-transform duration-300 transform shadow-2xl ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           
           <button onClick={() => setIsMobileMenuOpen(false)} className="absolute top-5 right-5 text-gray-400 hover:text-white"><X size={24} /></button>
 
-          <div className="flex items-center gap-3 mb-10 px-2">
-             <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center font-bold text-xl text-white">AS</div>
+          {/* ЛОГО В МЕНЮ (КЛІКАБЕЛЬНЕ) */}
+          <button onClick={() => { setActiveTab('feed'); setIsMobileMenuOpen(false); }} className="flex items-center gap-3 mb-10 px-2 group">
+             <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center font-bold text-xl text-white group-hover:scale-105 transition-transform">AS</div>
              <span className="text-white font-bold text-lg">Absolute Spy</span>
-          </div>
+          </button>
 
-          {/* ПУНКТИ МЕНЮ */}
           <Link href="/studio" className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-blue-600/20 to-purple-600/20 text-blue-400 border border-blue-500/30 rounded-xl mb-4" onClick={() => setIsMobileMenuOpen(false)}>
             <Sparkles size={20} className="animate-pulse" />
             <span className="font-bold">AI Studio</span>
@@ -528,11 +509,15 @@ export default function Home() {
 
       {/* 2. --- SIDEBAR (ДЛЯ КОМП'ЮТЕРІВ) --- */}
       <aside className="w-80 bg-white border-r border-gray-200 hidden lg:flex flex-col sticky h-screen top-0">
-        <div className="p-6 border-b border-gray-100 flex items-center gap-3">
-          <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-600/10">
-             <Send className="text-white" size={20} />
-          </div>
-          <span className="font-black text-lg text-purple-600 uppercase italic tracking-tighter leading-none">Absolute Spy</span>
+        
+        {/* ЛОГО В SIDEBAR (КЛІКАБЕЛЬНЕ) */}
+        <div className="p-6 border-b border-gray-100">
+           <button onClick={() => setActiveTab('feed')} className="flex items-center gap-3 group">
+            <div className="w-10 h-10 bg-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-600/10 group-hover:scale-105 transition-transform">
+              <Send className="text-white" size={20} />
+            </div>
+            <span className="font-black text-lg text-purple-600 uppercase italic tracking-tighter leading-none">Absolute Spy</span>
+           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2 no-scrollbar">
@@ -540,7 +525,6 @@ export default function Home() {
             <LayoutDashboard size={18} /> Стрічка
           </button>
           
-          {/* КНОПКА AI STUDIO */}
           <Link 
             href="/studio" 
             className="w-full p-4 mb-3 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 transition-all bg-gradient-to-r from-[#7000FF]/10 to-blue-600/10 text-[#7000FF] border border-[#7000FF]/20 hover:bg-[#7000FF] hover:text-white group"
@@ -631,23 +615,24 @@ export default function Home() {
              <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 hover:bg-gray-100 rounded-lg">
                <Menu size={24} />
              </button>
-             <span className="font-black text-lg text-purple-600 uppercase italic">Absolute Spy</span>
+             {/* ЛОГО В ШАПЦІ (КЛІКАБЕЛЬНЕ) */}
+             <button onClick={() => setActiveTab('feed')}>
+               <span className="font-black text-lg text-purple-600 uppercase italic">Absolute Spy</span>
+             </button>
            </div>
-           {/* Можна додати аватарку або пошук тут */}
         </div>
 
 
         {activeTab === 'feed' ? (
           <>
             <header className="bg-white p-6 border-b border-gray-100 shadow-sm z-10 hidden lg:block">
-              {/* Desktop Header */}
               <div className="max-w-4xl mx-auto relative group">
                 <Search className="absolute left-5 top-4 text-gray-300 group-focus-within:text-purple-600" size={20} />
                 <input type="text" placeholder="Пошук..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full h-14 bg-gray-100 rounded-2xl pl-14 pr-6 font-bold text-gray-700 outline-none focus:bg-white focus:ring-4 focus:ring-purple-600/5 transition-all" />
               </div>
             </header>
             
-            {/* Мобільний пошук (окремо, під шапкою) */}
+            {/* Мобільний пошук */}
             <div className="lg:hidden p-4 bg-white border-b border-gray-100">
                <div className="relative">
                  <Search className="absolute left-4 top-3 text-gray-300" size={18} />
@@ -658,7 +643,7 @@ export default function Home() {
             <div className="flex-1 overflow-y-auto p-4 lg:p-8 bg-[#f8f9fc] no-scrollbar">
               <div className="max-w-5xl mx-auto">
                 
-                {/* --- SMART KATEGORII (ТОП-5) --- */}
+                {/* --- SMART KATEGORII --- */}
                 <div className="w-full mb-6 overflow-x-auto no-scrollbar">
                   <div className="flex gap-2 min-w-max pb-2 px-1">
                     <button 
@@ -689,37 +674,29 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
-                {/* ----------------------------- */}
 
-              {/* СІТКА КРЕАТИВІВ + SKELETONS */}
+              {/* СІТКА КРЕАТИВІВ */}
                 <div className="columns-2 md:columns-3 xl:columns-4 gap-4 px-2 pb-24">
                   {isLoading ? (
-                    // --- 💀 СКЕЛЕТОНИ (ЗАВАНТАЖЕННЯ) ---
                     [...Array(8)].map((_, i) => (
                       <div key={i} className="break-inside-avoid mb-4 bg-white rounded-[2rem] p-4 shadow-sm border border-gray-100">
-                        {/* Імітація картинки */}
                         <div className="w-full aspect-[4/5] bg-gray-200 rounded-2xl mb-4 animate-pulse relative overflow-hidden">
                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12 translate-x-[-100%] animate-[shimmer_1.5s_infinite]" />
                         </div>
-                        {/* Імітація бейджів */}
                         <div className="flex gap-2 mb-4">
                           <div className="w-16 h-5 bg-gray-200 rounded-lg animate-pulse" />
                           <div className="w-10 h-5 bg-gray-200 rounded-lg animate-pulse" />
                         </div>
-                        {/* Імітація заголовку */}
                         <div className="w-3/4 h-6 bg-gray-200 rounded-lg mb-3 animate-pulse" />
-                        {/* Імітація тексту */}
                         <div className="space-y-2 mb-5">
                           <div className="w-full h-3 bg-gray-200 rounded animate-pulse" />
                           <div className="w-5/6 h-3 bg-gray-200 rounded animate-pulse" />
                           <div className="w-4/6 h-3 bg-gray-200 rounded animate-pulse" />
                         </div>
-                        {/* Імітація кнопки */}
                         <div className="w-full h-10 bg-gray-100 rounded-xl animate-pulse" />
                       </div>
                     ))
                   ) : (
-                    // --- ✅ РЕАЛЬНІ ПОСТИ ---
                     filteredList.map((ad: any, index: number) => {
                       const isLocked = !isPro && (index % 6 !== 0);
                       return (
@@ -743,7 +720,6 @@ export default function Home() {
             </div>
           </>
         ) : activeTab === 'favorites' ? (
-          /* --- ЕКРАН ОБРАНОГО --- */
           <div className="flex-1 overflow-y-auto p-8 bg-[#f8f9fc] no-scrollbar animate-in fade-in duration-300">
             <header className="mb-8 max-w-5xl mx-auto flex items-center gap-4">
                <div className="w-12 h-12 bg-yellow-100 text-yellow-500 rounded-2xl flex items-center justify-center shadow-sm">
@@ -814,7 +790,6 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* --- ЛІЧИЛЬНИК ЛІМІТІВ --- */}
               <div className="bg-white p-10 rounded-[3rem] shadow-sm border border-gray-100 mb-8 relative overflow-hidden group">
                 {userProfile?.subscription_tier === 'pro' && (
                   <div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110 duration-700" />
@@ -958,7 +933,7 @@ export default function Home() {
           </div>
         ) : null}
 
-        {/* --- MOBILE BOTTOM NAVIGATION (Залишив для зручності) --- */}
+        {/* --- MOBILE BOTTOM NAVIGATION --- */}
         <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl border-t border-gray-100 pb-safe shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
           <div className="flex items-center justify-between w-full max-w-md mx-auto px-10 py-3">
             <button 
@@ -1000,134 +975,83 @@ export default function Home() {
         </div>
       </main>
 
-      {/* --- МОДАЛКИ --- */}
-      
-      {/* 1. Деталі креативу */}
-{selectedAd && (
-  <div className="fixed inset-0 z-[110] flex items-center justify-center lg:p-4 bg-black/95 backdrop-blur-md" onClick={() => setSelectedAd(null)}>
-    
-    <div className="hidden lg:flex fixed inset-x-0 top-1/2 -translate-y-1/2 pointer-events-none justify-between px-8 z-[130]">
-      {currentViewableIndex > 0 ? (
-        <button 
-          onClick={(e) => { e.stopPropagation(); goToPrevAd(); }} 
-          className="pointer-events-auto p-5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all backdrop-blur-md border border-white/10 group"
-        >
-          <ChevronLeft size={48} className="group-hover:-translate-x-1 transition-transform" />
-        </button>
-      ) : <div />}
-
-      {currentViewableIndex < activeNavigationList.length - 1 ? (
-        <button 
-          onClick={(e) => { e.stopPropagation(); goToNextAd(); }} 
-          className="pointer-events-auto p-5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all backdrop-blur-md border border-white/10 group"
-        >
-          <ChevronRight size={48} className="group-hover:translate-x-1 transition-transform" />
-        </button>
-      ) : <div />}
-    </div>
-
-    <div 
-      onTouchStart={onTouchStart} 
-      onTouchMove={onTouchMove} 
-      onTouchEnd={onTouchEnd}
-      className="relative w-full lg:max-w-6xl h-full lg:h-[90vh] bg-white lg:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}
-    >
-      <button onClick={() => setSelectedAd(null)} className="absolute top-4 right-4 z-[120] p-2 bg-black/20 backdrop-blur-md text-white rounded-full lg:hidden">
-        <X size={20} />
-      </button>
-
-      <div className="w-full lg:w-1/2 h-[45vh] lg:h-full bg-gray-950 flex items-center justify-center relative border-b lg:border-b-0 lg:border-r border-gray-100 group select-none">
-        {(() => {
-          const mediaUrls = selectedAd.image?.includes(',') 
-            ? selectedAd.image.split(',').map((url: string) => url.trim()).filter(Boolean)
-            : (selectedAd.image ? [selectedAd.image] : []);
-          
-          if (mediaUrls.length === 0) return <div className="text-gray-500 font-bold uppercase">Тільки текст</div>;
-
-          const currentUrl = mediaUrls[currentMediaIndex] || mediaUrls[0];
-          const isVideo = /\.(mp4|mov|avi|webm)$/i.test(currentUrl) || selectedAd.type === 'video';
-
-          return (
-            <>
-              {isVideo ? (
-                <video key={currentUrl} src={currentUrl} className="w-full h-full object-contain" controls autoPlay muted playsInline />
-              ) : (
-                <img key={currentUrl} src={currentUrl} className="w-full h-full object-contain" alt="Ad Content" />
-              )}
-
-              {mediaUrls.length > 1 && (
-                <>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCurrentMediaIndex(prev => prev > 0 ? prev - 1 : mediaUrls.length - 1);
-                    }}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/40 backdrop-blur-md text-white rounded-full flex items-center justify-center hover:bg-black/60 transition-all border border-white/10 z-20"
-                  >
-                    <ChevronLeft size={20} />
-                  </button>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCurrentMediaIndex(prev => prev < mediaUrls.length - 1 ? prev + 1 : 0);
-                    }}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/40 backdrop-blur-md text-white rounded-full flex items-center justify-center hover:bg-black/60 transition-all border border-white/10 z-20"
-                  >
-                    <ChevronRight size={20} />
-                  </button>
-
-                  <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-white tracking-widest z-20">
-                    {currentMediaIndex + 1} / {mediaUrls.length}
-                  </div>
-                </>
-              )}
-            </>
-          );
-        })()}
-      </div>
-
-      <div className="w-full lg:w-1/2 flex-1 overflow-y-auto bg-white flex flex-col p-5 md:p-10 no-scrollbar">
-        <div className="mb-5 flex items-center justify-between">
-          <div className="flex gap-2">
-            <span className="text-[9px] font-black text-purple-600 uppercase bg-purple-50 px-2.5 py-1 rounded-md">{selectedAd.format || 'Post'}</span>
-            <span className="text-[9px] font-black text-gray-500 uppercase bg-gray-50 px-2.5 py-1 rounded-md">{selectedAd.geo || 'World'}</span>
+      {/* --- МОДАЛКИ (БЕЗ ЗМІН) --- */}
+      {selectedAd && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center lg:p-4 bg-black/95 backdrop-blur-md" onClick={() => setSelectedAd(null)}>
+          {/* Навігація ПК */}
+          <div className="hidden lg:flex fixed inset-x-0 top-1/2 -translate-y-1/2 pointer-events-none justify-between px-8 z-[130]">
+            {currentViewableIndex > 0 ? (
+              <button onClick={(e) => { e.stopPropagation(); goToPrevAd(); }} className="pointer-events-auto p-5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all backdrop-blur-md border border-white/10 group"><ChevronLeft size={48} className="group-hover:-translate-x-1 transition-transform" /></button>
+            ) : <div />}
+            {currentViewableIndex < activeNavigationList.length - 1 ? (
+              <button onClick={(e) => { e.stopPropagation(); goToNextAd(); }} className="pointer-events-auto p-5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all backdrop-blur-md border border-white/10 group"><ChevronRight size={48} className="group-hover:translate-x-1 transition-transform" /></button>
+            ) : <div />}
           </div>
-          <div className="text-[10px] font-black text-gray-300 uppercase tracking-widest">
-            {currentViewableIndex + 1} / {activeNavigationList.length}
-          </div>
-        </div>
 
-        <h2 className="text-xl lg:text-3xl font-black text-gray-900 mb-4 leading-tight uppercase italic">{selectedAd.title}</h2>
-        
-        <div className="bg-gray-50 p-4 rounded-2xl mb-6 border border-gray-100">
-          <p className="text-gray-700 leading-relaxed font-medium text-sm whitespace-pre-wrap">
-            {selectedAd.mainText || selectedAd.description}
-          </p>
-        </div>
+          <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} className="relative w-full lg:max-w-6xl h-full lg:h-[90vh] bg-white lg:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col lg:flex-row animate-in slide-in-from-bottom duration-300" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setSelectedAd(null)} className="absolute top-4 right-4 z-[120] p-2 bg-black/20 backdrop-blur-md text-white rounded-full lg:hidden"><X size={20} /></button>
 
-        {selectedAd.buttons && Array.isArray(selectedAd.buttons) && selectedAd.buttons.length > 0 && (
-            <div className="flex flex-col gap-2 mb-6">
-                {selectedAd.buttons.map((btn: string, i: number) => (
-                    <div key={i} className="w-full py-3 bg-white text-gray-800 rounded-xl font-bold text-center text-[10px] uppercase tracking-widest border border-gray-200 shadow-sm">{btn}</div>
-                ))}
+            {/* Медіа */}
+            <div className="w-full lg:w-1/2 h-[45vh] lg:h-full bg-gray-950 flex items-center justify-center relative border-b lg:border-b-0 lg:border-r border-gray-100 group select-none">
+              {(() => {
+                const mediaUrls = selectedAd.image?.includes(',') 
+                  ? selectedAd.image.split(',').map((url: string) => url.trim()).filter(Boolean)
+                  : (selectedAd.image ? [selectedAd.image] : []);
+                
+                if (mediaUrls.length === 0) return <div className="text-gray-500 font-bold uppercase">Тільки текст</div>;
+                const currentUrl = mediaUrls[currentMediaIndex] || mediaUrls[0];
+                const isVideo = /\.(mp4|mov|avi|webm)$/i.test(currentUrl) || selectedAd.type === 'video';
+
+                return (
+                  <>
+                    {isVideo ? (
+                      <video key={currentUrl} src={currentUrl} className="w-full h-full object-contain" controls autoPlay muted playsInline />
+                    ) : (
+                      <img key={currentUrl} src={currentUrl} className="w-full h-full object-contain" alt="Ad Content" />
+                    )}
+                    {mediaUrls.length > 1 && (
+                      <>
+                        <button onClick={(e) => { e.stopPropagation(); setCurrentMediaIndex(prev => prev > 0 ? prev - 1 : mediaUrls.length - 1); }} className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/40 backdrop-blur-md text-white rounded-full flex items-center justify-center hover:bg-black/60 transition-all border border-white/10 z-20"><ChevronLeft size={20} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); setCurrentMediaIndex(prev => prev < mediaUrls.length - 1 ? prev + 1 : 0); }} className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/40 backdrop-blur-md text-white rounded-full flex items-center justify-center hover:bg-black/60 transition-all border border-white/10 z-20"><ChevronRight size={20} /></button>
+                        <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-white tracking-widest z-20">{currentMediaIndex + 1} / {mediaUrls.length}</div>
+                      </>
+                    )}
+                  </>
+                );
+              })()}
             </div>
-        )}
-        
-        <div className="mt-auto pt-6 flex gap-2">
-          <button className="flex-1 py-4 bg-purple-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-200">
-            <Download size={16} /> Завантажити
-          </button>
-          {selectedAd.url && (
-            <a href={selectedAd.url} target="_blank" rel="noopener noreferrer" className="flex-1 py-4 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
-              <Share2 size={16} /> Перейти
-            </a>
-          )}
+
+            {/* Інфо */}
+            <div className="w-full lg:w-1/2 flex-1 overflow-y-auto bg-white flex flex-col p-5 md:p-10 no-scrollbar">
+              <div className="mb-5 flex items-center justify-between">
+                <div className="flex gap-2">
+                  <span className="text-[9px] font-black text-purple-600 uppercase bg-purple-50 px-2.5 py-1 rounded-md">{selectedAd.format || 'Post'}</span>
+                  <span className="text-[9px] font-black text-gray-500 uppercase bg-gray-50 px-2.5 py-1 rounded-md">{selectedAd.geo || 'World'}</span>
+                </div>
+                <div className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{currentViewableIndex + 1} / {activeNavigationList.length}</div>
+              </div>
+              <h2 className="text-xl lg:text-3xl font-black text-gray-900 mb-4 leading-tight uppercase italic">{selectedAd.title}</h2>
+              <div className="bg-gray-50 p-4 rounded-2xl mb-6 border border-gray-100">
+                <p className="text-gray-700 leading-relaxed font-medium text-sm whitespace-pre-wrap">{selectedAd.mainText || selectedAd.description}</p>
+              </div>
+              {selectedAd.buttons && Array.isArray(selectedAd.buttons) && selectedAd.buttons.length > 0 && (
+                  <div className="flex flex-col gap-2 mb-6">
+                      {selectedAd.buttons.map((btn: string, i: number) => (
+                          <div key={i} className="w-full py-3 bg-white text-gray-800 rounded-xl font-bold text-center text-[10px] uppercase tracking-widest border border-gray-200 shadow-sm">{btn}</div>
+                      ))}
+                  </div>
+              )}
+              <div className="mt-auto pt-6 flex gap-2">
+                <button className="flex-1 py-4 bg-purple-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-purple-200"><Download size={16} /> Завантажити</button>
+                {selectedAd.url && (
+                  <a href={selectedAd.url} target="_blank" rel="noopener noreferrer" className="flex-1 py-4 bg-gray-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2"><Share2 size={16} /> Перейти</a>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
-  </div>
-)}
-      {/* 2. Додавання креативу */}
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
           <div className="bg-white w-full max-w-xl rounded-[2.5rem] p-8 animate-in zoom-in max-h-[90vh] overflow-y-auto no-scrollbar shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -1136,21 +1060,13 @@ export default function Home() {
               <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-50 rounded-full transition-colors"><X /></button>
             </div>
             <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Заголовок</p>
-                <input type="text" className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border border-gray-100" value={newAd.title} onChange={(e) => setNewAd({...newAd, title: e.target.value})} />
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Текст посту</p>
-                <textarea className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border border-gray-100 h-28" value={newAd.mainText} onChange={(e) => setNewAd({...newAd, mainText: e.target.value})} />
-              </div>
+              <div className="space-y-1"><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Заголовок</p><input type="text" className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border border-gray-100" value={newAd.title} onChange={(e) => setNewAd({...newAd, title: e.target.value})} /></div>
+              <div className="space-y-1"><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Текст посту</p><textarea className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border border-gray-100 h-28" value={newAd.mainText} onChange={(e) => setNewAd({...newAd, mainText: e.target.value})} /></div>
               <div className="space-y-1">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Категорії</p>
                 <div className="flex flex-wrap gap-2 mb-2 p-2 bg-gray-50 rounded-2xl min-h-[50px] border border-gray-100">
                   {newAd.categories.map((cat: any) => (
-                    <span key={cat} className="bg-white border border-purple-100 text-purple-600 px-3 py-1 rounded-xl text-[10px] font-black uppercase flex items-center gap-1">
-                      {cat} <button onClick={() => setNewAd({...newAd, categories: newAd.categories.filter((c: any) => c !== cat)})}><X size={10}/></button>
-                    </span>
+                    <span key={cat} className="bg-white border border-purple-100 text-purple-600 px-3 py-1 rounded-xl text-[10px] font-black uppercase flex items-center gap-1">{cat} <button onClick={() => setNewAd({...newAd, categories: newAd.categories.filter((c: any) => c !== cat)})}><X size={10}/></button></span>
                   ))}
                   <select className="bg-transparent text-xs font-bold text-gray-500 outline-none w-full" onChange={(e) => { if (e.target.value && !newAd.categories.includes(e.target.value)) setNewAd({...newAd, categories: [...newAd.categories, e.target.value]}); e.target.value = ""; }}>
                     <option value="">+ Додати категорію</option>
@@ -1158,90 +1074,36 @@ export default function Home() {
                   </select>
                 </div>
               </div>
-              
               <div className="space-y-1">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Кнопки (Enter щоб додати)</p>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Кнопки (Enter)</p>
                 <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                   <div className="flex flex-wrap gap-2 mb-3">
                      {newAd.buttons.map((btn: any, idx: number) => (
-                        <span key={idx} className="bg-gray-800 text-white px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-2">
-                          {btn}
-                          <button onClick={() => setNewAd({...newAd, buttons: newAd.buttons.filter((_: any, i: number) => i !== idx)})}><X size={12}/></button>
-                        </span>
+                        <span key={idx} className="bg-gray-800 text-white px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-2">{btn}<button onClick={() => setNewAd({...newAd, buttons: newAd.buttons.filter((_: any, i: number) => i !== idx)})}><X size={12}/></button></span>
                      ))}
                   </div>
                   <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      id="btn-input"
-                      placeholder="Назва кнопки..." 
-                      className="flex-1 bg-white p-2 rounded-xl text-xs font-bold border border-gray-200 outline-none"
-                      onKeyDown={(e: any) => {
-                        if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                          setNewAd({...newAd, buttons: [...newAd.buttons, e.currentTarget.value.trim()]});
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                    />
-                    <button 
-                      onClick={() => {
-                        const input = document.getElementById('btn-input') as HTMLInputElement;
-                        if (input && input.value.trim()) {
-                          setNewAd({...newAd, buttons: [...newAd.buttons, input.value.trim()]});
-                          input.value = '';
-                        }
-                      }}
-                      className="bg-gray-200 p-2 rounded-xl hover:bg-gray-300"
-                    >
-                      <Plus size={16}/>
-                    </button>
+                    <input type="text" id="btn-input" placeholder="Назва кнопки..." className="flex-1 bg-white p-2 rounded-xl text-xs font-bold border border-gray-200 outline-none" onKeyDown={(e: any) => { if (e.key === 'Enter' && e.currentTarget.value.trim()) { setNewAd({...newAd, buttons: [...newAd.buttons, e.currentTarget.value.trim()]}); e.currentTarget.value = ''; } }} />
+                    <button onClick={() => { const input = document.getElementById('btn-input') as HTMLInputElement; if (input && input.value.trim()) { setNewAd({...newAd, buttons: [...newAd.buttons, input.value.trim()]}); input.value = ''; } }} className="bg-gray-200 p-2 rounded-xl hover:bg-gray-300"><Plus size={16}/></button>
                   </div>
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
-                 <div><p className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1">Формат</p>
-                    <select value={newAd.format} onChange={(e) => setNewAd({...newAd, format: e.target.value})} className="w-full p-3 bg-gray-50 rounded-2xl font-bold text-xs">
-                        {formatsList.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
-                    </select>
-                 </div>
-                 <div><p className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1">ГЕО</p>
-                    <select value={newAd.geo} onChange={(e) => setNewAd({...newAd, geo: e.target.value})} className="w-full p-3 bg-gray-50 rounded-2xl font-bold text-xs">
-                        {geoList.map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
-                 </div>
+                 <div><p className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1">Формат</p><select value={newAd.format} onChange={(e) => setNewAd({...newAd, format: e.target.value})} className="w-full p-3 bg-gray-50 rounded-2xl font-bold text-xs">{formatsList.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}</select></div>
+                 <div><p className="text-[10px] font-black text-gray-400 uppercase ml-2 mb-1">ГЕО</p><select value={newAd.geo} onChange={(e) => setNewAd({...newAd, geo: e.target.value})} className="w-full p-3 bg-gray-50 rounded-2xl font-bold text-xs">{geoList.map(g => <option key={g} value={g}>{g}</option>)}</select></div>
               </div>
-              
               <div className="relative pt-2">
-                <input 
-                  type="file" 
-                  id="file-upload" 
-                  className="hidden" 
-                  multiple
-                  onChange={(e) => {
-                    if (e.target.files) {
-                      const filesArray = Array.from(e.target.files);
-                      setNewAd({ ...newAd, files: filesArray, file: filesArray[0] }); 
-                    }
-                  }} 
-                />
+                <input type="file" id="file-upload" className="hidden" multiple onChange={(e) => { if (e.target.files) { const filesArray = Array.from(e.target.files); setNewAd({ ...newAd, files: filesArray, file: filesArray[0] }); } }} />
                   <label htmlFor="file-upload" className={`w-full p-4 rounded-2xl font-bold border-2 border-dashed flex items-center justify-center gap-2 cursor-pointer ${newAd.files?.length > 0 ? 'bg-purple-50 border-purple-200 text-purple-600' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
-                      <Upload size={20} /> 
-                      {newAd.files?.length > 0 
-                        ? `Вибрано файлів: ${newAd.files.length}` 
-                        : (newAd.file ? newAd.file.name : "Завантажити медіа (можна кілька)")}
+                      <Upload size={20} /> {newAd.files?.length > 0 ? `Вибрано файлів: ${newAd.files.length}` : (newAd.file ? newAd.file.name : "Завантажити медіа")}
                   </label>
               </div>
-
-              <button onClick={saveNewAd} disabled={isLoading} className="w-full py-4 bg-purple-600 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl mt-4">
-                {isLoading ? 'Завантаження...' : 'ОПУБЛІКУВАТИ'}
-              </button>
+              <button onClick={saveNewAd} disabled={isLoading} className="w-full py-4 bg-purple-600 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl mt-4">{isLoading ? 'Завантаження...' : 'ОПУБЛІКУВАТИ'}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 3. Онбординг */}
       {showOnboarding && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-10 text-center animate-in zoom-in shadow-2xl">
@@ -1249,9 +1111,7 @@ export default function Home() {
             <h2 className="text-2xl font-black text-gray-900 mb-6 leading-tight">У якій сфері ти працюєш у Telegram?</h2>
             <div className="space-y-3 max-h-[50vh] overflow-y-auto no-scrollbar">
               {workSpheresList.map((sphere) => (
-                <button key={sphere} onClick={() => saveWorkSphere(sphere)} className="w-full py-4 px-6 border-2 border-gray-50 rounded-2xl font-bold text-sm text-gray-600 hover:border-purple-600 hover:text-purple-600 hover:bg-purple-50 transition-all text-left flex justify-between items-center group">
-                  {sphere} <ChevronRight size={18} className="text-gray-200 group-hover:text-purple-600" />
-                </button>
+                <button key={sphere} onClick={() => saveWorkSphere(sphere)} className="w-full py-4 px-6 border-2 border-gray-50 rounded-2xl font-bold text-sm text-gray-600 hover:border-purple-600 hover:text-purple-600 hover:bg-purple-50 transition-all text-left flex justify-between items-center group">{sphere} <ChevronRight size={18} className="text-gray-200 group-hover:text-purple-600" /></button>
               ))}
             </div>
           </div>
