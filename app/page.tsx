@@ -180,7 +180,7 @@ export default function Home() {
     }
   };
 
-  // --- 🔗 ФУНКЦІЯ ОБ'ЄДНАННЯ АКАУНТІВ (ВИПРАВЛЕНА ЛОГІКА) ---
+  // --- 🔗 ФУНКЦІЯ ОБ'ЄДНАННЯ АКАУНТІВ (ВИПРАВЛЕНА) ---
   const handleMergeAccount = async () => {
     if (!mergeEmail || !mergePassword) return alert("Заповніть пошту та пароль!");
     setIsLoading(true);
@@ -188,6 +188,7 @@ export default function Home() {
     try {
       const tg = (window as any).Telegram?.WebApp;
       const tgUser = tg?.initDataUnsafe?.user;
+      
       if (!tgUser) throw new Error("Відкрийте додаток через Telegram");
 
       // 1. Відв'язуємо TG ID від поточного тимчасового акаунта
@@ -214,17 +215,8 @@ export default function Home() {
       if (updateError) throw updateError;
 
       alert("✅ Акаунти успішно синхронізовано!");
-      
-      // 🔥 ВАЖЛИВО: Ми НЕ перезавантажуємо сторінку, а просто оновлюємо стан
-      setUser(data.user); // Перемикаємо користувача в React
-      setIsMergeModalOpen(false); // Закриваємо модалку
-      
-      // Оновлюємо дані вже для НОВОГО користувача
-      setTimeout(() => {
-        fetchAds();
-        fetchFavorites();
-        checkUserProfile();
-      }, 500);
+      setIsMergeModalOpen(false); 
+      window.location.reload(); 
 
     } catch (error: any) {
       alert("Помилка: " + error.message);
@@ -314,19 +306,15 @@ export default function Home() {
 
   useEffect(() => {
     const initApp = async () => {
-      // 1. Спочатку перевіряємо, чи є вже активна сесія (щоб не перезаходити в тимчасовий акаунт)
+      // 1. Спочатку перевіряємо, чи є вже активна сесія від Supabase
       const { data: { session } } = await supabase.auth.getSession();
       
-      let shouldRunTgAuth = true;
-
-      // Якщо ми вже залогінені, і це нормальна пошта (не tg_...), то не треба запускати авто-вхід телеграма
-      if (session?.user?.email && !session.user.email.startsWith('tg_')) {
-         shouldRunTgAuth = false;
-         setUser(session.user);
-         setAuthLoading(false);
+      if (session) {
+        setUser(session.user);
       }
 
-      if (shouldRunTgAuth && typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
+      // 2. Перевіряємо, чи ми в Телеграмі
+      if (typeof window !== 'undefined' && (window as any).Telegram?.WebApp) {
         const tg = (window as any).Telegram.WebApp;
         tg.ready();
         tg.expand();
@@ -336,18 +324,24 @@ export default function Home() {
         tg.HapticFeedback.impactOccurred('medium');
 
         const tgData = tg.initDataUnsafe?.user;
-        if (tgData) await handleTelegramAuth(tgData);
-      } else if (!session) {
-         // Якщо немає ні сесії, ні телеграма - просто вантажимось
-         setUser(null);
-         setAuthLoading(false);
+        
+        // Якщо ми в ТГ і ще не авторизовані або це тимчасова сесія - логінимось через ТГ
+        if (tgData && (!session || session.user.email?.startsWith('tg_'))) {
+           await handleTelegramAuth(tgData);
+        }
       }
+
+      // 3. ВАЖЛИВО: Вимикаємо завантаження в будь-якому випадку!
+      // Якщо це ПК і немає сесії - покажеться Auth. Якщо це ТГ - ми вже запустили handleTelegramAuth.
+      setAuthLoading(false);
     };
 
     initApp();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      // Також перестраховуємось
+      setAuthLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -1338,6 +1332,20 @@ export default function Home() {
                   </label>
               </div>
               <button onClick={saveNewAd} disabled={isLoading} className="w-full py-4 bg-purple-600 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl mt-4">{isLoading ? 'Завантаження...' : 'ОПУБЛІКУВАТИ'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showOnboarding && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-10 text-center animate-in zoom-in shadow-2xl">
+            <div className="text-5xl mb-4 animate-bounce">👋</div>
+            <h2 className="text-2xl font-black text-gray-900 mb-6 leading-tight">У якій сфері ти працюєш у Telegram?</h2>
+            <div className="space-y-3 max-h-[50vh] overflow-y-auto no-scrollbar">
+              {workSpheresList.map((sphere) => (
+                <button key={sphere} onClick={() => saveWorkSphere(sphere)} className="w-full py-4 px-6 border-2 border-gray-50 rounded-2xl font-bold text-sm text-gray-600 hover:border-purple-600 hover:text-purple-600 hover:bg-purple-50 transition-all text-left flex justify-between items-center group">{sphere} <ChevronRight size={18} className="text-gray-200 group-hover:text-purple-600" /></button>
+              ))}
             </div>
           </div>
         </div>
