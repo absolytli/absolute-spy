@@ -14,24 +14,23 @@ import {
   useTonAddress 
 } from '@tonconnect/ui-react';
 
-// Об'єднаний імпорт іконок
+// Об'єднаний імпорт іконок (Додав нові: Wallet, ArrowUpRight, ArrowDownLeft, Clock, CreditCard)
 import { 
   Sparkles, Menu, Search, Filter, X, ChevronDown, Star,
   Send, Play, Download, ChevronLeft, ChevronRight, Plus, Upload, Trash2,
   AlignLeft, MousePointer2, PlusCircle, FileText, Tag, Copy, Check, 
   Smartphone, MessageCircle, Mic, Share2, Globe, Camera, Smile, Layers, LogOut,
-  User, LayoutDashboard, Settings, Database, ShieldCheck, Wallet // Додали Wallet
+  User, LayoutDashboard, Settings, Database, ShieldCheck, 
+  Wallet, ArrowUpRight, ArrowDownLeft, Clock, CreditCard 
 } from 'lucide-react';
 
 // --- КОМПОНЕНТ АВТО-ЗБЕРЕЖЕННЯ ГАМАНЦЯ ---
-// Цей компонент "живе" всередині провайдера і має доступ до хуків TON
 const WalletAutoSaver = ({ userId, onWalletSaved }: { userId: string, onWalletSaved: (addr: string) => void }) => {
   const userFriendlyAddress = useTonAddress();
 
   useEffect(() => {
     const saveWallet = async () => {
       if (userFriendlyAddress && userId) {
-        // Зберігаємо в базу, якщо адреса є
         await supabase.from('profiles').update({ wallet_address: userFriendlyAddress }).eq('id', userId);
         onWalletSaved(userFriendlyAddress);
       }
@@ -39,7 +38,7 @@ const WalletAutoSaver = ({ userId, onWalletSaved }: { userId: string, onWalletSa
     saveWallet();
   }, [userFriendlyAddress, userId, onWalletSaved]);
 
-  return null; // Цей компонент нічого не малює, він тільки логіку робить
+  return null;
 };
 
 export default function Home() {
@@ -57,6 +56,7 @@ export default function Home() {
   const [selectedAd, setSelectedAd] = useState<any>(null); 
   const [searchTerm, setSearchTerm] = useState('');
   const [ads, setAds] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]); // Історія транзакцій
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   
   const [profiles, setProfiles] = useState<any[]>([]); 
@@ -332,6 +332,7 @@ export default function Home() {
     }
   };
 
+  // --- ВАЖЛИВО: ОНОВЛЕНИЙ initApp ДЛЯ ПК ---
   useEffect(() => {
     const initApp = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -356,6 +357,7 @@ export default function Home() {
         }
       }
 
+      // Завжди вимикаємо лоадер в кінці
       setAuthLoading(false);
     };
 
@@ -378,6 +380,12 @@ export default function Home() {
       if (data) setAds(data);
     } catch (error: any) { console.error('Помилка завантаження:', error.message); } 
     finally { setIsLoading(false); }
+  };
+
+  const fetchTransactions = async () => {
+    if (!user) return;
+    const { data } = await supabase.from('transactions').select('*').order('created_at', { ascending: false });
+    if (data) setTransactions(data);
   };
 
   const fetchProfiles = async () => {
@@ -431,6 +439,7 @@ export default function Home() {
       fetchAds();
       fetchFavorites();
       checkUserProfile();
+      fetchTransactions();
       if (user.email === ADMIN_EMAIL) fetchProfiles();
     }
   }, [user]);
@@ -652,6 +661,9 @@ export default function Home() {
             <button onClick={() => { setActiveTab('favorites'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'favorites' ? 'bg-white/10 text-white' : 'text-gray-400'}`}>
               <Star size={20} /> Обране
             </button>
+            <button onClick={() => { setActiveTab('wallet'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'wallet' ? 'bg-white/10 text-white' : 'text-gray-400'}`}>
+              <Wallet size={20} /> Гаманець
+            </button>
             <button onClick={() => { setActiveTab('profile'); setIsMobileMenuOpen(false); }} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeTab === 'profile' ? 'bg-white/10 text-white' : 'text-gray-400'}`}>
               <User size={20} /> Мій кабінет
             </button>
@@ -699,6 +711,9 @@ export default function Home() {
                   {favoriteIds.length}
                 </span>
               )}
+            </button>
+            <button onClick={() => setActiveTab('wallet')} className={`w-full p-4 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 transition-all ${activeTab === 'wallet' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-400 hover:bg-gray-50'}`}>
+              <Wallet size={18} /> Гаманець
             </button>
             <button onClick={() => setActiveTab('profile')} className={`w-full p-4 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 transition-all ${activeTab === 'profile' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-400 hover:bg-gray-50'}`}>
               <User size={18} /> Мій кабінет
@@ -901,6 +916,90 @@ export default function Home() {
                 )}
               </div>
             </div>
+        // --- Вклдадка ГАМАНЕЦЬ ---
+        ) : activeTab === 'wallet' ? (
+          <div className="flex-1 overflow-y-auto p-8 lg:p-12 bg-[#f8f9fc] no-scrollbar animate-in fade-in duration-500">
+            <div className="max-w-4xl mx-auto">
+              <header className="mb-8">
+                <h1 className="text-4xl font-black text-gray-900 tracking-tighter uppercase italic">Мій Гаманець</h1>
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs mt-2">Керування фінансами та історія</p>
+              </header>
+
+              {/* 1. КАРТКА БАЛАНСУ */}
+              <div className="bg-gray-900 rounded-[2.5rem] p-8 md:p-12 relative overflow-hidden shadow-2xl shadow-gray-200 mb-8 text-white">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/30 rounded-full blur-3xl -mr-16 -mt-16" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl -ml-16 -mb-16" />
+                
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-8">
+                    <div>
+                      <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mb-2">Загальний баланс</p>
+                      <h2 className="text-5xl md:text-6xl font-black tracking-tighter">
+                        ${userProfile?.balance || '0.00'}
+                      </h2>
+                    </div>
+                    <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
+                      <Wallet size={32} />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button className="flex-1 py-4 bg-white text-black rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-gray-100 transition-all flex items-center justify-center gap-2">
+                      <ArrowDownLeft size={18} /> Поповнити
+                    </button>
+                    <button className="flex-1 py-4 bg-white/10 text-white border border-white/10 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-white/20 transition-all flex items-center justify-center gap-2">
+                      <ArrowUpRight size={18} /> Вивести
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. ІСТОРІЯ ТРАНЗАКЦІЙ */}
+              <h3 className="font-black text-gray-900 uppercase tracking-widest text-sm mb-6 flex items-center gap-2">
+                <Clock size={18} /> Історія операцій
+              </h3>
+
+              {transactions.length > 0 ? (
+                <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
+                  {transactions.map((tx: any) => (
+                    <div key={tx.id} className="p-6 border-b border-gray-50 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                          tx.type === 'deposit' ? 'bg-green-50 text-green-600' : 
+                          tx.type === 'expense' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'
+                        }`}>
+                          {tx.type === 'deposit' ? <ArrowDownLeft size={24} /> : <ArrowUpRight size={24} />}
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 text-sm">{tx.description || 'Транзакція'}</p>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                            {new Date(tx.created_at).toLocaleDateString()} • {new Date(tx.created_at).toLocaleTimeString().slice(0, 5)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-black text-lg ${tx.type === 'deposit' ? 'text-green-600' : 'text-gray-900'}`}>
+                          {tx.type === 'deposit' ? '+' : '-'}${tx.amount}
+                        </p>
+                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${
+                          tx.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {tx.status === 'completed' ? 'Успішно' : 'В обробці'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-20 text-center">
+                  <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
+                    <CreditCard size={32} />
+                  </div>
+                  <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">Історія порожня</p>
+                </div>
+              )}
+            </div>
+          </div>
           ) : activeTab === 'profile' ? (
             <div className="flex-1 overflow-y-auto p-8 lg:p-12 bg-[#f8f9fc] no-scrollbar animate-in fade-in duration-500">
               <div className="max-w-4xl mx-auto">
@@ -931,6 +1030,7 @@ export default function Home() {
                   {userProfile?.subscription_tier === 'pro' && (
                     <div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110 duration-700" />
                   )}
+
                   <div className="flex justify-between items-end mb-6">
                     <div>
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Доступ на сьогодні</p>
@@ -942,6 +1042,7 @@ export default function Home() {
                         )}
                       </h3>
                     </div>
+                    
                     {userProfile?.subscription_tier !== 'pro' && (
                       <div className="text-right">
                         <p className="text-[10px] font-black text-purple-600 uppercase mb-1">Залишилось</p>
@@ -951,6 +1052,7 @@ export default function Home() {
                       </div>
                     )}
                   </div>
+
                   {userProfile?.subscription_tier !== 'pro' ? (
                     <div className="space-y-3">
                       <div className="w-full h-4 bg-gray-50 rounded-full border border-gray-100 p-1 overflow-hidden">
@@ -1161,6 +1263,10 @@ export default function Home() {
               <button onClick={() => setActiveTab('favorites')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'favorites' ? 'text-purple-600' : 'text-gray-400'}`}>
                 <Star size={22} fill={activeTab === 'favorites' ? "currentColor" : "none"} strokeWidth={2} />
                 <span className="text-[9px] font-black uppercase tracking-wider">Обране</span>
+              </button>
+              <button onClick={() => setActiveTab('wallet')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'wallet' ? 'text-purple-600' : 'text-gray-400'}`}>
+                <Wallet size={22} strokeWidth={activeTab === 'wallet' ? 2.5 : 2} />
+                <span className="text-[9px] font-black uppercase tracking-wider">Гаманець</span>
               </button>
               <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'profile' ? 'text-purple-600' : 'text-gray-400'}`}>
                 <User size={22} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
