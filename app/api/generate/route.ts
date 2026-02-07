@@ -1,37 +1,56 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   const apiKey = process.env.GOOGLE_AI_KEY;
   if (!apiKey) return NextResponse.json({ error: "Ключ не знайдено" }, { status: 500 });
 
-  const genAI = new GoogleGenerativeAI(apiKey);
+  const { topic, audience, style } = await req.json();
 
-  // Список моделей, які актуальні на 2026 рік
-  const modelsToTry = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-8b"];
+  // Список моделей, які актуальні на 2026 рік. Ми спробуємо їх усі!
+  const modelsToTry = [
+    "gemini-2.0-flash",       // Найновіша на зараз
+    "gemini-1.5-flash",       // Стандартна
+    "gemini-1.5-flash-8b",    // Полегшена
+    "gemini-1.5-pro"          // Потужна
+  ];
 
   for (const modelName of modelsToTry) {
     try {
-      console.log(`📡 Спроба підключення до: ${modelName}`);
-      const model = genAI.getGenerativeModel({ model: modelName });
+      console.log(`📡 Пробуємо модель: ${modelName}...`);
       
-      const prompt = `Напиши рекламний пост для Telegram. Тема: Тестовий запуск. Мова: Українська.`;
-      
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: `Напиши рекламний пост для Telegram. Тема: ${topic}. Аудиторія: ${audience}. Стиль: ${style}. Українською мовою. Пиши ТІЛЬКИ текст поста.`
+              }]
+            }]
+          })
+        }
+      );
 
-      if (text) {
-        console.log(`✅ УСПІХ! Працює модель: ${modelName}`);
-        return NextResponse.json({ text });
+      const data = await response.json();
+
+      // Якщо модель спрацювала — ми знайшли переможця!
+      if (data.candidates && data.candidates[0].content.parts[0].text) {
+        console.log(`✅ УСПІХ! Спрацювала модель: ${modelName}`);
+        return NextResponse.json({ text: data.candidates[0].content.parts[0].text });
       }
+
+      console.warn(`⚠️ ${modelName} видала помилку: ${data.error?.message || "невідомо"}`);
+      
     } catch (err: any) {
-      console.log(`❌ ${modelName} недоступна: ${err.message}`);
-      continue; // Пробуємо наступну
+      console.error(`❌ Помилка з ${modelName}:`, err.message);
     }
   }
 
+  // Якщо ми тут — жодна модель не підійшла
   return NextResponse.json({ 
     error: "Всі моделі повернули 404", 
-    details: "Спробуйте створити НОВИЙ ключ на іншому акаунті Google або змініть регіон у VPN на США." 
+    details: "Перевір, чи не заблоковано аккаунт або чи увімкнено VPN." 
   }, { status: 404 });
 }

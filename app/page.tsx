@@ -3,10 +3,15 @@
 import AdCard from './components/AdCard';
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { supabase } from './lib/supabase';
 import Auth from './components/Auth'; 
+
+// Об'єднаний імпорт іконок (без дублікатів + додали Sparkles)
 import { 
-  Search, Send, Play, Star, Download, ChevronLeft, ChevronRight, Plus, X, Upload, Trash2,
+  Sparkles, // ✨ Наша нова іконка для AI Studio
+  Search, Filter, X, ChevronDown, Star, // Ті, що були в першому рядку
+  Send, Play, Download, ChevronLeft, ChevronRight, Plus, Upload, Trash2,
   AlignLeft, MousePointer2, PlusCircle, FileText, Tag, Copy, Check, 
   Smartphone, MessageCircle, Mic, Share2, Globe, Camera, Smile, Layers, LogOut,
   User, LayoutDashboard, Settings, Database, ShieldCheck
@@ -506,6 +511,19 @@ export default function Home() {
             <LayoutDashboard size={18} /> Стрічка
           </button>
           
+          {/* --- КНОПКА AI STUDIO --- */}
+          <Link 
+            href="/studio" 
+            className="w-full p-4 mb-3 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 transition-all bg-gradient-to-r from-[#7000FF]/10 to-blue-600/10 text-[#7000FF] border border-[#7000FF]/20 hover:bg-[#7000FF] hover:text-white group"
+          >
+            <Sparkles size={18} className="group-hover:animate-spin-slow" />
+            <span>AI Studio</span>
+            <span className="ml-auto bg-[#7000FF] text-white px-2 py-0.5 rounded text-[9px] font-black group-hover:bg-white group-hover:text-[#7000FF]">
+              NEW
+            </span>
+          </Link>
+          {/* ------------------------- */}
+
           <button onClick={() => setActiveTab('favorites')} className={`w-full p-4 rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center gap-3 transition-all ${activeTab === 'favorites' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-400 hover:bg-gray-50'}`}>
             <Star size={18} /> Обране
             {favoriteIds.length > 0 && (

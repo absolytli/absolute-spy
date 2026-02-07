@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Script from "next/script"; // Імпортуємо компонент для скриптів
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,16 +26,15 @@ export default function RootLayout({
   return (
     <html lang="uk">
       <head>
-        {/* Підключаємо Telegram SDK перед завантаженням основної логіки */}
         <Script 
           src="https://telegram.org/js/telegram-web-app.js" 
           strategy="beforeInteractive" 
         />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-black text-white`}>
+        <main className="min-h-screen">
+          {children}
+        </main>
       </body>
     </html>
   );
