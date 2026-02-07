@@ -204,26 +204,6 @@ export default function Home() {
 
       if (loginError) throw loginError;
 
-      // 4. Якщо пароль вірний — записуємо Telegram ID у цей старий профіль
-      const { error: updateError } = await supabase.from('profiles').update({
-        telegram_id: tgUser.id,
-        avatar_url: tgUser.photo_url,
-        full_name: tgUser.first_name
-      }).eq('id', data.user.id);
-
-      if (updateError) throw updateError;
-
-      alert("✅ Акаунти успішно синхронізовано!");
-      setIsMergeModalOpen(false); // Закриваємо модалку
-      window.location.reload();   // Оновлюємо сторінку, щоб підтягнути старі дані
-
-    } catch (error: any) {
-      alert("Помилка: " + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // --- ЛОГІКА ПРИВ'ЯЗКИ EMAIL ---
   const handleLinkEmail = async () => {
     if (!newEmail.includes('@')) return alert("Введіть коректну пошту");
@@ -1138,6 +1118,23 @@ export default function Home() {
                         <p className="text-[9px] text-gray-400 font-bold mt-2">Встановіть пароль, щоб заходити з комп'ютера без Telegram.</p>
                       </div>
                     </div>
+                    {/* --- КАРТКА ЗАПУСКУ СИНХРОНІЗАЦІЇ (КРОК 3) --- */}
+<div className="p-6 bg-blue-50 rounded-[2rem] border border-blue-100 shadow-inner mb-6">
+  <div className="flex items-center gap-3 mb-3">
+    {/* Ми використовуємо іконку Globe, яку вже імпортували */}
+    <div className="p-2 bg-blue-600 text-white rounded-lg"><Globe size={16} /></div>
+    <p className="text-[10px] font-black text-blue-900 uppercase tracking-widest">Синхронізація з ПК</p>
+  </div>
+  <p className="text-[9px] font-bold text-blue-700/60 mb-4 uppercase leading-relaxed">
+    Вже користувалися сайтом? Увійдіть, щоб об'єднати дані.
+  </p>
+  <button 
+    onClick={() => setIsMergeModalOpen(true)} // Цей рядок відкриває вікно з Кроку 4
+    className="w-full py-3 bg-white text-blue-600 rounded-xl text-[10px] font-black uppercase border border-blue-200 shadow-sm active:scale-95 transition-all"
+  >
+    🔗 Увійти в існуючий акаунт
+  </button>
+</div>
                     {/* --------------------------------- */}
 
                     <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 pb-8 border-b border-gray-50">
@@ -1145,6 +1142,52 @@ export default function Home() {
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Сфера діяльності</p>
                         <p className="text-sm font-bold text-gray-800">{userProfile?.work_sphere || 'Не вказано'}</p>
                       </div>
+                      {/* --- МОДАЛЬНЕ ВІКНО ЛОГІНУ (SYNC POPUP) --- */}
+{isMergeModalOpen && (
+  <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200" onClick={() => setIsMergeModalOpen(false)}>
+    {/* onClick вище закриває вікно при натисканні на фон */}
+    <div 
+      className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative animate-in zoom-in duration-300" 
+      onClick={e => e.stopPropagation()} // Зупиняє закриття, якщо тиснути всередині вікна
+    >
+      <button onClick={() => setIsMergeModalOpen(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 transition-colors">
+        <X size={24} />
+      </button>
+
+      <div className="text-center mb-8">
+        <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
+          <Globe className="text-white" size={28} />
+        </div>
+        <h2 className="text-xl font-black text-gray-900 uppercase italic tracking-tighter">Синхронізація</h2>
+        <p className="text-gray-400 text-[9px] font-bold uppercase mt-1">Введіть дані вашого акаунта</p>
+      </div>
+
+      <div className="space-y-4">
+        <input 
+          type="email" 
+          placeholder="Ваш Email" 
+          className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl px-5 text-sm font-bold outline-none focus:border-blue-600 transition-all" 
+          value={mergeEmail} 
+          onChange={e => setMergeEmail(e.target.value)} 
+        />
+        <input 
+          type="password" 
+          placeholder="Ваш Пароль" 
+          className="w-full h-14 bg-gray-50 border border-gray-100 rounded-2xl px-5 text-sm font-bold outline-none focus:border-blue-600 transition-all" 
+          value={mergePassword} 
+          onChange={e => setMergePassword(e.target.value)} 
+        />
+        <button 
+          onClick={handleMergeAccount} 
+          disabled={isLoading} 
+          className="w-full h-14 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl active:scale-95 transition-all mt-4"
+        >
+          {isLoading ? 'З\'єднуємо...' : 'Підтвердити зв\'язок'}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
                       <button onClick={() => setShowOnboarding(true)} className="px-5 py-2.5 bg-gray-50 text-[9px] font-black uppercase rounded-xl text-gray-500 hover:bg-gray-100 transition-colors">Змінити</button>
                     </div>
 
