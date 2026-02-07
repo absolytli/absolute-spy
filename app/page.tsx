@@ -48,11 +48,6 @@ export default function Home() {
   const [mergeEmail, setMergeEmail] = useState('');
   const [mergePassword, setMergePassword] = useState('');
 
-  // --- СТАТИ ДЛЯ ОБ'ЄДНАННЯ АКАУНТІВ ---
-  const [isMergeMode, setIsMergeMode] = useState(false); // Чи показувати форму вводу
-  const [mergeEmail, setMergeEmail] = useState('');      // Сюди пишемо стару пошту
-  const [mergePassword, setMergePassword] = useState(''); // Сюди пишемо старий пароль
-
   // --- 📱 СВАЙПИ ---
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
